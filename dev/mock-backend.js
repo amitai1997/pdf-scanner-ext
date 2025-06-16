@@ -1,8 +1,8 @@
 // PDF Scanner Extension - Mock Backend Server
 // This is a simple Express server to simulate the backend API during development
 
-// To run: node src/mock-backend.js
-// Server will listen on port 8080
+// To run: npm run dev:backend
+// Server will listen on port 8080 by default or port specified in .env
 
 import express from 'express';
 import cors from 'cors';
@@ -10,6 +10,10 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Get directory name for ES modules
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,7 +51,7 @@ const upload = multer({
 
 // Create Express app
 const app = express();
-const PORT = 8080;
+const PORT = process.env.DEV_BACKEND_PORT || 8080;
 
 // Enable Cross-Origin Resource Sharing
 app.use(cors());

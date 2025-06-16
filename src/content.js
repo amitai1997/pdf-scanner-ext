@@ -1,7 +1,7 @@
 // PDF Scanner Extension - Content Script
 // This runs in the context of AI chat websites to monitor for PDF uploads
 
-// Create a logger for the content script
+// Create a logger for the content script (since content scripts can't import modules directly)
 const logger = {
   log(message, data) {
     try {
@@ -39,6 +39,11 @@ const logger = {
     }
   }
 };
+
+// Constants
+const SCAN_TIMEOUT = 10000; // 10 seconds
+const NOTIFICATION_DURATION = 5000; // 5 seconds
+const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
 
 // Log that content script has loaded
 logger.log(`Content script loaded on ${window.location.href}`);

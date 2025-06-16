@@ -1,5 +1,8 @@
 // PDF Scanner Extension - Request Interceptor Service
 
+import { FormDataParser } from './formDataParser.js';
+import logger from './logger.js';
+
 /**
  * Handles intercepting web requests to detect and scan PDF uploads
  */
@@ -422,15 +425,18 @@ class RequestInterceptor {
   }
 }
 
-// Create singleton instance but don't assign it to a global variable yet
-const interceptorInstance = new RequestInterceptor();
+// Create the interceptor instance
+const interceptor = new RequestInterceptor();
 
-// Export for service worker context - only if not already defined
-if (typeof self !== 'undefined' && !self.interceptor) {
-  self.interceptor = interceptorInstance;
+// Export for ES modules
+export { interceptor };
+
+// Make available in service worker context
+if (typeof self !== 'undefined') {
+  self.interceptor = interceptor;
 }
 
-// Export for module context if needed
+// Export for CommonJS modules if needed
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { interceptor: interceptorInstance };
-} 
+  module.exports = { interceptor };
+}

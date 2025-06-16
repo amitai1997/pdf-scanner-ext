@@ -1,58 +1,31 @@
 // PDF Scanner Extension - Background Service Worker
 
-// Create logger directly in the service worker
-const logger = {
-  log(message, data) {
-    try {
-      if (data !== undefined) {
-        console.log(`[PDF Scanner] ${message}`, data);
-      } else {
-        console.log(`[PDF Scanner] ${message}`);
-      }
-    } catch (e) {
-      // Silent fail if console is not available
-    }
-  },
-
-  warn(message, data) {
-    try {
-      if (data !== undefined) {
-        console.warn(`[PDF Scanner] WARNING: ${message}`, data);
-      } else {
-        console.warn(`[PDF Scanner] WARNING: ${message}`);
-      }
-    } catch (e) {
-      // Silent fail if console is not available
-    }
-  },
-
-  error(message, data) {
-    try {
-      if (data !== undefined) {
-        console.error(`[PDF Scanner] ERROR: ${message}`, data);
-      } else {
-        console.error(`[PDF Scanner] ERROR: ${message}`);
-      }
-    } catch (e) {
-      // Silent fail if console is not available
-    }
-  }
-};
+// Import logger from utility
+import logger from './utils/logger.js';
 
 // Make logger available globally
 self.logger = logger;
 
-// Load interceptor
-importScripts('./utils/interceptor.js');
+// Import interceptor
+import { interceptor } from './utils/interceptor.js';
 
-// Access the interceptor from the self object
-const interceptor = self.interceptor;
+// No need to redefine interceptor, it's already imported above
+// const interceptor = self.interceptor; <- This line causes the conflict
 
 logger.log('PDF Scanner service worker loaded');
 
 class PDFScannerBackground {
   constructor() {
-    this.BACKEND_URL = 'http://localhost:8080'; // Updated to match host permissions
+    // Environment detection
+    this.isDevelopment = !chrome.runtime.id || 
+                         chrome.runtime.id.includes('development') || 
+                         chrome.runtime.getManifest().version.includes('0.');
+    
+    // URLs based on environment
+    this.BACKEND_URL = this.isDevelopment 
+      ? 'http://localhost:8080' 
+      : 'https://api.your-production-backend.com';
+    
     this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'; // From assignment
     this.API_URL = 'https://eu.prompt.security/api/protect';
     
@@ -60,7 +33,11 @@ class PDFScannerBackground {
     this.scanQueue = new Map();
     
     // Debug mode for additional logging
-    this.debugMode = true;
+    this.debugMode = this.isDevelopment;
+    
+    // Log environment
+    logger.log(`Running in ${this.isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
+    logger.log(`Using backend URL: ${this.BACKEND_URL}`);
     
     this.init();
   }

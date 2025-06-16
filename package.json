@@ -8,13 +8,13 @@
     "lint": "eslint src/ --ext .js",
     "lint:fix": "eslint src/ --ext .js --fix",
     "format": "prettier --write src/**/*.js public/**/*.{html,css}",
-    "dev": "web-ext run --source-dir . --target chromium",
+    "dev:backend": "node dev/mock-backend.js",
+    "dev": "npm run dev:backend & web-ext run --source-dir . --target chromium",
     "build": "web-ext build --source-dir . --artifacts-dir dist",
     "test": "jest",
     "test:watch": "jest --watch",
     "validate": "web-ext lint --source-dir .",
-    "clean": "rm -rf dist/ web-ext-artifacts/",
-    "mock-backend": "node src/mock-backend.js"
+    "clean": "rm -rf dist/ web-ext-artifacts/"
   },
   "keywords": [
     "chrome-extension",
@@ -27,11 +27,13 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "dotenv": "^16.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-security": "^3.0.0",
     "jest": "^29.7.0",
     "jest-chrome": "^0.8.0",
+    "nodemon": "^3.0.0",
     "prettier": "^3.0.0",
     "web-ext": "^8.0.0"
   },
