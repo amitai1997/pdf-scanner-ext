@@ -1,84 +1,51 @@
 # PDF Scanner Chrome Extension
 
-A Chrome extension that scans PDFs for secrets and policy violations before they are uploaded to AI services like ChatGPT and Claude.
+A Chrome extension that intercepts PDF uploads to AI services like ChatGPT and Claude to scan them for secrets before they reach the AI service.
 
 ## Features
 
-- Automatically intercepts PDF uploads to AI services
-- Scans PDFs for secrets, API keys, and sensitive information
-- Shows notifications when secrets are detected
-- Provides visual warnings in the UI
-- Allows manual scanning of PDF files
-
-## Supported AI Services
-
-- OpenAI ChatGPT (chat.openai.com)
-- Anthropic Claude (claude.ai)
-- API endpoints for both services
+- Immediate PDF scanning upon file selection
+- Detects sensitive information in PDFs before upload
+- Works with ChatGPT, Claude, and other AI services
+- Provides clear warnings when secrets are detected
+- Allows users to cancel uploads containing sensitive data
 
 ## Installation
 
-### Development Mode
-
 1. Clone this repository
 2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" in the top-right corner
-4. Click "Load unpacked" and select the project directory
-5. The extension should now be installed and active
-
-### From Chrome Web Store
-
-*Coming soon*
+3. Enable "Developer mode" in the top right
+4. Click "Load unpacked" and select the extension directory
+5. The extension is now installed and active
 
 ## Usage
 
-### Automatic Scanning
-
-The extension automatically monitors for PDF uploads to supported AI services. When a PDF containing secrets is detected, the extension will:
-
-1. Show a notification
-2. Display a warning in the UI
-3. Log the detection in the extension's history
-
-### Manual Scanning
-
-1. Click on the extension icon in the toolbar
-2. Click "Scan PDF" in the popup
-3. Select a PDF file to scan
-4. View the scan results in the popup
-
-### Keyboard Shortcut
-
-- `Ctrl+Shift+S` (Windows/Linux) or `Cmd+Shift+S` (Mac): Open the PDF scanner
+1. When you select a PDF file to upload to an AI service, the extension will automatically scan it
+2. A scanning indicator will appear while the file is being analyzed
+3. If no secrets are found, a green indicator will confirm the file is safe to upload
+4. If secrets are detected, a warning modal will appear with details and options to proceed or cancel
 
 ## Development
 
-### Project Structure
+### Prerequisites
 
-```
-pdf-scanner-ext/
-  ├── public/
-  │   ├── popup.html       # Extension popup UI
-  │   └── styles/          # CSS files
-  ├── src/
-  │   ├── background.js    # Service worker
-  │   ├── content.js       # Content script
-  │   ├── popup.js         # Popup script
-  │   └── utils/           # Utility functions
-  │       └── interceptor.js  # PDF interception logic
-  └── manifest.json        # Extension manifest
+- Node.js and npm
+
+### Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
+npm test
 ```
 
-### Building
+## Security Notes
 
-No build step is required for development. For production, you may want to minify the JavaScript files.
-
-## Security Considerations
-
-- The extension runs with minimal permissions
-- PDF scanning happens locally before upload
-- No data is sent to external servers (except for the scanning API)
-- Content Security Policy is enforced
+- The extension scans PDFs locally before they're uploaded
+- No data is sent to external servers (except for the AI service you're using)
+- Sensitive information is never logged or stored
 
 ## License
 
