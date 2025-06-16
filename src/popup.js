@@ -43,13 +43,8 @@ logger.log('PDF Scanner popup loaded');
 
 class PDFScannerPopup {
   constructor() {
-    this.pdfInput = document.getElementById('pdfInput');
-    this.scanButton = document.getElementById('scanButton');
-    this.statusElement = document.getElementById('status');
-    this.fileLabel = document.querySelector('.file-label');
-    this.buttonText = document.querySelector('.button-text');
-    this.spinner = document.querySelector('.spinner');
-    this.popupContainer = document.querySelector('.popup-container');
+    // Initialize element references
+    this.initializeElements();
 
     this.selectedFile = null;
     this.isScanning = false;
@@ -65,6 +60,28 @@ class PDFScannerPopup {
     this.isDevelopment = this.checkDevelopmentMode();
     
     this.init();
+  }
+  
+  initializeElements() {
+    // Get all required DOM elements
+    this.pdfInput = document.getElementById('pdfInput');
+    this.scanButton = document.getElementById('scanButton');
+    this.statusElement = document.getElementById('status');
+    this.fileLabel = document.querySelector('.file-label');
+    this.fileText = document.querySelector('.file-text');
+    this.buttonText = document.querySelector('.button-text');
+    this.spinner = document.querySelector('.spinner');
+    this.popupContainer = document.querySelector('.popup-container');
+    
+    // Log if any elements are missing
+    if (!this.pdfInput) logger.error('Missing element: #pdfInput');
+    if (!this.scanButton) logger.error('Missing element: #scanButton');
+    if (!this.statusElement) logger.error('Missing element: #status');
+    if (!this.fileLabel) logger.error('Missing element: .file-label');
+    if (!this.fileText) logger.error('Missing element: .file-text');
+    if (!this.buttonText) logger.error('Missing element: .button-text');
+    if (!this.spinner) logger.error('Missing element: .spinner');
+    if (!this.popupContainer) logger.error('Missing element: .popup-container');
   }
   
   checkDevelopmentMode() {
@@ -88,6 +105,12 @@ class PDFScannerPopup {
   }
   
   showDevelopmentModeIndicator() {
+    // Check if popupContainer exists before appending
+    if (!this.popupContainer) {
+      logger.error('Cannot show dev mode indicator: popupContainer not found');
+      return;
+    }
+    
     const devBadge = document.createElement('div');
     devBadge.className = 'dev-badge';
     devBadge.textContent = 'DEV MODE';
@@ -134,16 +157,27 @@ class PDFScannerPopup {
     }
   }
 
+  /**
+   * Bind event handlers to UI elements
+   */
   bindEvents() {
     // File input change handler
-    this.pdfInput.addEventListener('change', (event) => {
-      this.handleFileSelect(event);
-    });
+    if (this.pdfInput) {
+      this.pdfInput.addEventListener('change', (event) => {
+        this.handleFileSelect(event);
+      });
+    } else {
+      logger.error('Cannot bind events: pdfInput not found');
+    }
 
     // Scan button click handler
-    this.scanButton.addEventListener('click', () => {
-      this.handleScanClick();
-    });
+    if (this.scanButton) {
+      this.scanButton.addEventListener('click', () => {
+        this.handleScanClick();
+      });
+    } else {
+      logger.error('Cannot bind events: scanButton not found');
+    }
 
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((message) => {
@@ -151,6 +185,10 @@ class PDFScannerPopup {
     });
   }
 
+  /**
+   * Handle file selection from the file input
+   * @param {Event} event - Change event from file input
+   */
   handleFileSelect(event) {
     const file = event.target.files[0];
 
@@ -177,18 +215,46 @@ class PDFScannerPopup {
     }
 
     this.selectedFile = file;
-    this.fileLabel.classList.add('has-file');
-    this.fileLabel.querySelector('.file-text').textContent = file.name;
+    
+    // Update file label if available
+    if (this.fileLabel) {
+      this.fileLabel.classList.add('has-file');
+    }
+    
+    // Update file text if available
+    if (this.fileText) {
+      this.fileText.textContent = file.name;
+    }
+    
     this.updateStatus(`Ready to scan: ${file.name} (${this.formatFileSize(file.size)})`, 'success');
     this.updateLoadingState('fileSelected');
   }
 
+  /**
+   * Reset the file selection UI
+   */
   resetFileSelection() {
     this.selectedFile = null;
-    this.fileLabel.classList.remove('has-file');
-    this.fileLabel.querySelector('.file-text').textContent = 'Choose PDF file';
-    this.scanButton.disabled = true;
-    this.pdfInput.value = '';
+    
+    // Reset file label if available
+    if (this.fileLabel) {
+      this.fileLabel.classList.remove('has-file');
+    }
+    
+    // Reset file text if available
+    if (this.fileText) {
+      this.fileText.textContent = 'Choose PDF file';
+    }
+    
+    // Disable scan button if available
+    if (this.scanButton) {
+      this.scanButton.disabled = true;
+    }
+    
+    // Reset file input if available
+    if (this.pdfInput) {
+      this.pdfInput.value = '';
+    }
   }
 
   async handleScanClick() {
@@ -270,43 +336,54 @@ class PDFScannerPopup {
     });
   }
 
+  /**
+   * Set the UI to scanning or not scanning state
+   * @param {boolean} isScanning - Whether scanning is in progress
+   */
   setScanning(isScanning) {
     this.isScanning = isScanning;
-    this.scanButton.disabled = isScanning || !this.selectedFile;
-
-    if (isScanning) {
-      this.scanButton.classList.add('scanning');
-      this.buttonText.textContent = 'Scanning...';
-      this.spinner.style.display = 'inline';
-    } else {
-      this.scanButton.classList.remove('scanning');
-      this.buttonText.textContent = 'Scan for Secrets';
-      this.spinner.style.display = 'none';
+    
+    // Update button state
+    if (this.scanButton) {
+      this.scanButton.disabled = isScanning;
     }
+    
+    // Update spinner
+    if (this.spinner) {
+      this.spinner.style.display = isScanning ? 'inline-block' : 'none';
+    }
+    
+    // Update button text
+    if (this.buttonText) {
+      this.buttonText.textContent = isScanning ? 'Scanning...' : 'Scan PDF';
+    }
+    
+    logger.log(`Scanning state set to: ${isScanning}`);
   }
 
+  /**
+   * Update status message in the UI
+   * @param {string} message - Status message to display
+   * @param {string} type - Status type (info, success, warning, error)
+   */
   updateStatus(message, type = 'info') {
-    const statusText = this.statusElement.querySelector('.status-text');
-    statusText.textContent = message;
-
-    // Reset classes
-    statusText.className = 'status-text';
-
-    // Add status type class
-    switch (type) {
-      case 'success':
-        statusText.classList.add('status-success');
-        break;
-      case 'warning':
-        statusText.classList.add('status-warning');
-        break;
-      case 'error':
-        statusText.classList.add('status-error');
-        break;
-      default:
-        // info - no additional class
-        break;
+    // Safety check for statusElement
+    if (!this.statusElement) {
+      logger.error('Cannot update status: statusElement not found');
+      return;
     }
+    
+    // Clear previous status classes
+    this.statusElement.classList.remove('active', 'inactive', 'warning', 'error', 'success', 'info');
+    
+    // Add new status class
+    this.statusElement.classList.add(type);
+    
+    // Update text content
+    this.statusElement.textContent = message;
+    
+    // Log status update
+    logger.log(`Status updated [${type}]: ${message}`);
   }
 
   async fileToBase64(file) {

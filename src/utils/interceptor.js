@@ -1,7 +1,48 @@
 // PDF Scanner Extension - Request Interceptor Service
 
-import { FormDataParser } from './formDataParser.js';
-import logger from './logger.js';
+// Create a simple logger if not already available
+if (!self.logger) {
+  self.logger = {
+    log(message, data) {
+      try {
+        if (data !== undefined) {
+          console.log(`[PDF Scanner] ${message}`, data);
+        } else {
+          console.log(`[PDF Scanner] ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    warn(message, data) {
+      try {
+        if (data !== undefined) {
+          console.warn(`[PDF Scanner] WARNING: ${message}`, data);
+        } else {
+          console.warn(`[PDF Scanner] WARNING: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    error(message, data) {
+      try {
+        if (data !== undefined) {
+          console.error(`[PDF Scanner] ERROR: ${message}`, data);
+        } else {
+          console.error(`[PDF Scanner] ERROR: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    }
+  };
+}
+
+// We'll use FormDataParser directly from self when needed
+// No importScripts here to avoid circular dependencies
 
 /**
  * Handles intercepting web requests to detect and scan PDF uploads
@@ -425,18 +466,7 @@ class RequestInterceptor {
   }
 }
 
-// Create the interceptor instance
-const interceptor = new RequestInterceptor();
-
-// Export for ES modules
-export { interceptor };
-
-// Make available in service worker context
-if (typeof self !== 'undefined') {
-  self.interceptor = interceptor;
-}
-
-// Export for CommonJS modules if needed
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { interceptor };
+// Create the interceptor instance only if it doesn't exist yet
+if (!self.interceptor) {
+  self.interceptor = new RequestInterceptor();
 }

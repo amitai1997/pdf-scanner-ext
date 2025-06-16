@@ -324,20 +324,53 @@ class FormDataParser {
   }
 }
 
-// Export for ES modules
-export { FormDataParser };
-
-// Export for CommonJS modules if needed
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { FormDataParser };
+// Create a simple logger if not already available
+if (!self.logger) {
+  self.logger = {
+    log(message, data) {
+      try {
+        if (data !== undefined) {
+          console.log(`[PDF Scanner] ${message}`, data);
+        } else {
+          console.log(`[PDF Scanner] ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    warn(message, data) {
+      try {
+        if (data !== undefined) {
+          console.warn(`[PDF Scanner] WARNING: ${message}`, data);
+        } else {
+          console.warn(`[PDF Scanner] WARNING: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    error(message, data) {
+      try {
+        if (data !== undefined) {
+          console.error(`[PDF Scanner] ERROR: ${message}`, data);
+        } else {
+          console.error(`[PDF Scanner] ERROR: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    }
+  };
 }
 
-// Make available in service worker context
-if (typeof self !== 'undefined') {
+// Make FormDataParser available globally only if not already defined
+if (typeof self !== 'undefined' && !self.FormDataParser) {
   self.FormDataParser = FormDataParser;
 }
 
 // For non-service worker contexts
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !window.FormDataParser) {
   window.FormDataParser = FormDataParser;
 } 
