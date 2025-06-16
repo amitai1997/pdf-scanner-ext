@@ -1,6 +1,6 @@
 // PDF Scanner Extension - Popup Script
 
-// Create a logger for the popup
+// Create a logger for the popup (since popup scripts can't import modules directly)
 const logger = {
   log(message, data) {
     try {
@@ -13,7 +13,7 @@ const logger = {
       // Silent fail if console is not available
     }
   },
-
+  
   warn(message, data) {
     try {
       if (data !== undefined) {
@@ -25,7 +25,7 @@ const logger = {
       // Silent fail if console is not available
     }
   },
-
+  
   error(message, data) {
     try {
       if (data !== undefined) {
@@ -49,16 +49,89 @@ class PDFScannerPopup {
     this.fileLabel = document.querySelector('.file-label');
     this.buttonText = document.querySelector('.button-text');
     this.spinner = document.querySelector('.spinner');
+    this.popupContainer = document.querySelector('.popup-container');
 
     this.selectedFile = null;
     this.isScanning = false;
+    this.loadingState = {
+      initial: true,
+      fileSelected: false,
+      scanning: false,
+      scanComplete: false,
+      error: false
+    };
 
+    // Check if we're in development mode
+    this.isDevelopment = this.checkDevelopmentMode();
+    
     this.init();
+  }
+  
+  checkDevelopmentMode() {
+    // Check extension version for development mode
+    const manifest = chrome.runtime.getManifest();
+    return manifest.version.startsWith('0.') || 
+           (manifest.version_name && manifest.version_name.includes('Development'));
   }
 
   init() {
     this.bindEvents();
     this.updateStatus('Select a PDF file to begin scanning', 'info');
+    
+    // Show development mode indicator if needed
+    if (this.isDevelopment) {
+      this.showDevelopmentModeIndicator();
+    }
+    
+    // Update UI state
+    this.updateLoadingState('initial');
+  }
+  
+  showDevelopmentModeIndicator() {
+    const devBadge = document.createElement('div');
+    devBadge.className = 'dev-badge';
+    devBadge.textContent = 'DEV MODE';
+    this.popupContainer.appendChild(devBadge);
+    
+    // Add dev mode class to body for styling
+    document.body.classList.add('dev-mode');
+    
+    logger.log('Running in DEVELOPMENT mode');
+  }
+  
+  updateLoadingState(state) {
+    // Reset all states
+    Object.keys(this.loadingState).forEach(key => {
+      this.loadingState[key] = false;
+    });
+    
+    // Set new state
+    if (this.loadingState.hasOwnProperty(state)) {
+      this.loadingState[state] = true;
+    }
+    
+    // Update UI based on state
+    this.updateUIForLoadingState();
+  }
+  
+  updateUIForLoadingState() {
+    // Update UI elements based on current loading state
+    if (this.loadingState.scanning) {
+      this.setScanning(true);
+    } else if (this.loadingState.scanComplete) {
+      this.setScanning(false);
+      this.scanButton.disabled = false;
+    } else if (this.loadingState.fileSelected) {
+      this.setScanning(false);
+      this.scanButton.disabled = false;
+    } else if (this.loadingState.error) {
+      this.setScanning(false);
+      this.scanButton.disabled = !this.selectedFile;
+    } else {
+      // Initial state
+      this.setScanning(false);
+      this.scanButton.disabled = !this.selectedFile;
+    }
   }
 
   bindEvents() {
@@ -90,6 +163,7 @@ class PDFScannerPopup {
     if (file.type !== 'application/pdf') {
       this.updateStatus('Please select a PDF file', 'error');
       this.resetFileSelection();
+      this.updateLoadingState('error');
       return;
     }
 
@@ -98,14 +172,15 @@ class PDFScannerPopup {
     if (file.size > maxSize) {
       this.updateStatus('File too large. Maximum size is 10MB', 'error');
       this.resetFileSelection();
+      this.updateLoadingState('error');
       return;
     }
 
     this.selectedFile = file;
     this.fileLabel.classList.add('has-file');
     this.fileLabel.querySelector('.file-text').textContent = file.name;
-    this.scanButton.disabled = false;
     this.updateStatus(`Ready to scan: ${file.name} (${this.formatFileSize(file.size)})`, 'success');
+    this.updateLoadingState('fileSelected');
   }
 
   resetFileSelection() {
@@ -121,7 +196,7 @@ class PDFScannerPopup {
       return;
     }
 
-    this.setScanning(true);
+    this.updateLoadingState('scanning');
     this.updateStatus('Scanning PDF for secrets...', 'info');
 
     try {
@@ -137,11 +212,11 @@ class PDFScannerPopup {
       });
 
       this.handleScanResponse(response);
+      this.updateLoadingState('scanComplete');
     } catch (error) {
       logger.error('Scan error:', error);
       this.updateStatus(`Scan failed: ${error.message}`, 'error');
-    } finally {
-      this.setScanning(false);
+      this.updateLoadingState('error');
     }
   }
 
@@ -260,31 +335,18 @@ class PDFScannerPopup {
       return '0 Bytes';
     }
 
+    // Use a lookup table for units
+    const units = {
+      0: 'Bytes',
+      1: 'KB',
+      2: 'MB',
+      3: 'GB'
+    };
+    
     const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    // Instead of using array indexing which triggers the security warning,
-    // use a switch statement to select the unit
-    let unit;
-    switch (
-      Math.min(i, 3) // 3 is maximum index for size units
-    ) {
-      case 0:
-        unit = 'Bytes';
-        break;
-      case 1:
-        unit = 'KB';
-        break;
-      case 2:
-        unit = 'MB';
-        break;
-      case 3:
-      default:
-        unit = 'GB';
-        break;
-    }
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + unit;
+    const i = Math.min(3, Math.floor(Math.log(bytes) / Math.log(k)));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + units[i];
   }
 }
 

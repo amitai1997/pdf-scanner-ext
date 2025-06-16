@@ -324,7 +324,15 @@ class FormDataParser {
   }
 }
 
-// Make it available in the global scope if we're in a service worker
+// Export for ES modules
+export { FormDataParser };
+
+// Export for CommonJS modules if needed
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { FormDataParser };
+}
+
+// Make available in service worker context
 if (typeof self !== 'undefined') {
   self.FormDataParser = FormDataParser;
 }
