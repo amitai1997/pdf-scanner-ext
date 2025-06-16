@@ -1,16 +1,53 @@
 // PDF Scanner Extension - Background Service Worker
 
-// Import logger from utility
-import logger from './utils/logger.js';
+// Create a logger for the background script
+const logger = {
+  log(message, data) {
+    try {
+      if (data !== undefined) {
+        console.log(`[PDF Scanner] ${message}`, data);
+      } else {
+        console.log(`[PDF Scanner] ${message}`);
+      }
+    } catch (e) {
+      // Silent fail if console is not available
+    }
+  },
+  
+  warn(message, data) {
+    try {
+      if (data !== undefined) {
+        console.warn(`[PDF Scanner] WARNING: ${message}`, data);
+      } else {
+        console.warn(`[PDF Scanner] WARNING: ${message}`);
+      }
+    } catch (e) {
+      // Silent fail if console is not available
+    }
+  },
+  
+  error(message, data) {
+    try {
+      if (data !== undefined) {
+        console.error(`[PDF Scanner] ERROR: ${message}`, data);
+      } else {
+        console.error(`[PDF Scanner] ERROR: ${message}`);
+      }
+    } catch (e) {
+      // Silent fail if console is not available
+    }
+  }
+};
 
 // Make logger available globally
 self.logger = logger;
 
-// Import interceptor
-import { interceptor } from './utils/interceptor.js';
+// Import utility scripts in the correct order
+importScripts('./utils/formDataParser.js');
+importScripts('./utils/interceptor.js');
 
-// No need to redefine interceptor, it's already imported above
-// const interceptor = self.interceptor; <- This line causes the conflict
+// Access the interceptor from the global scope
+const interceptor = self.interceptor;
 
 logger.log('PDF Scanner service worker loaded');
 

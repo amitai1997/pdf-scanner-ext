@@ -9,7 +9,8 @@
     "lint:fix": "eslint src/ --ext .js --fix",
     "format": "prettier --write src/**/*.js public/**/*.{html,css}",
     "dev:backend": "node dev/mock-backend.js",
-    "dev": "npm run dev:backend & web-ext run --source-dir . --target chromium",
+    "dev:extension": "web-ext run --source-dir . --target chromium",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:extension\"",
     "build": "web-ext build --source-dir . --artifacts-dir dist",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -27,6 +28,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "concurrently": "^8.0.0",
     "dotenv": "^16.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
