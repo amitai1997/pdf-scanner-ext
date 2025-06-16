@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "PDF Scanner (Alpha)",
+  "description": "Scans selected PDFs for secrets and policy violations via Prompt Security API.",
+  "version": "0.1.0",
+
+  "action": {
+    "default_title": "Scan PDF",
+    "default_popup": "public/popup.html"
+  },
+
+  "background": {
+    "service_worker": "src/background.js"
+  },
+
+  "permissions": [
+    "storage",
+    "downloads",
+    "webRequest",
+    "notifications"
+  ],
+
+  "host_permissions": [
+    "https://eu.prompt.security/*",
+    "https://*.chatgpt.com/*",
+    "https://*.openai.com/*",
+    "https://*.claude.ai/*",
+    "https://*.anthropic.com/*",
+    "http://localhost:8080/*"
+  ],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.chatgpt.com/*", 
+        "https://*.openai.com/*", 
+        "https://*.claude.ai/*",
+        "https://*.anthropic.com/*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_start"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "public/styles/*.css",
+        "public/assets/*"
+      ],
+      "matches": [
+        "https://eu.prompt.security/*", 
+        "https://*.chatgpt.com/*", 
+        "https://*.openai.com/*", 
+        "https://*.claude.ai/*",
+        "https://*.anthropic.com/*"
+      ]
+    }
+  ],
+
+  "commands": {
+    "scan-selected-pdf": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "Scan currently selected PDF"
+    }
+  }
+}
