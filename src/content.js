@@ -570,6 +570,9 @@ class PDFMonitor {
     try {
       // Monitor dragover events
       document.addEventListener('dragover', (event) => {
+        // Prevent default to allow drop
+        event.preventDefault();
+        
         // Just log for now
         if (this.debugMode) {
           logger.log('Drag event detected');
@@ -578,6 +581,9 @@ class PDFMonitor {
       
       // Monitor drop events
       document.addEventListener('drop', (event) => {
+        // Always prevent default browser behavior
+        event.preventDefault();
+        
         if (event.dataTransfer && event.dataTransfer.files) {
           const files = Array.from(event.dataTransfer.files);
           const pdfFiles = files.filter(file => 
@@ -591,7 +597,28 @@ class PDFMonitor {
               names: pdfFiles.map(f => f.name)
             });
             
+            // Process each dropped PDF file
             pdfFiles.forEach(file => {
+              // Show scanning indicator to user
+              this.showScanningIndicator(file.name);
+              
+              // Immediate scan of the PDF
+              this.scanPDFImmediately(file).then(result => {
+                logger.log('Immediate scan result for dropped file:', result);
+                
+                if (result.secrets) {
+                  // If secrets found, show warning
+                  this.showSecretWarning(file.name, result);
+                } else {
+                  // If no secrets found, show safe indicator
+                  this.showSafeFileIndicator(file.name);
+                }
+              }).catch(error => {
+                logger.error('Error during immediate scan of dropped PDF', error);
+                this.showScanErrorIndicator(file.name);
+              });
+              
+              // Also track the upload through our normal channels as backup
               this.trackUpload(file);
             });
           }
@@ -623,7 +650,38 @@ class PDFMonitor {
               names: pdfFiles.map(f => f.name)
             });
             
+            // Try to prevent default paste behavior for PDFs
+            try {
+              if (event.cancelable) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            } catch (e) {
+              logger.error('Error preventing default paste behavior', e);
+            }
+            
+            // Process each pasted PDF file
             pdfFiles.forEach(file => {
+              // Show scanning indicator to user
+              this.showScanningIndicator(file.name);
+              
+              // Immediate scan of the PDF
+              this.scanPDFImmediately(file).then(result => {
+                logger.log('Immediate scan result for pasted file:', result);
+                
+                if (result.secrets) {
+                  // If secrets found, show warning
+                  this.showSecretWarning(file.name, result);
+                } else {
+                  // If no secrets found, show safe indicator
+                  this.showSafeFileIndicator(file.name);
+                }
+              }).catch(error => {
+                logger.error('Error during immediate scan of pasted PDF', error);
+                this.showScanErrorIndicator(file.name);
+              });
+              
+              // Also track the upload through our normal channels as backup
               this.trackUpload(file);
             });
           }
