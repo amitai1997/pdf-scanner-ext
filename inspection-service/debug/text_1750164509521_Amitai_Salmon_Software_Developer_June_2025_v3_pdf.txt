@@ -1,0 +1,122 @@
+
+
+AS
+Amitai Salmon
+Professional Summary
+Innovative senior backend software developer with 6+ years of
+comprehensive programming experience, specializing in cloud-native
+architectures, microservices, and AI-driven backend solutions. Proven
+track record of developing innovative software across diverse
+technological domains, with deep expertise in Python, AWS cloud
+infrastructure, and advanced API integration.
+Work History
+CyberArk (Contract through AppsForce) - Senior Backend
+Developer
+08/2024 - Current
+Waterfall Security (Contract through AppsForce) - Backend
+Developer
+04/2024 - 08/2024
+Amops.io - Backend Developer
+03/2023 - 03/2024
+Architected advanced SaaS solution for comprehensive identity risk
+detection and mitigation
+●
+Designed and implemented a fully serverless AWS architecture
+integrating multiple services: Lambda for compute, Step Functions
+for workflow orchestration, SNS/SQS for messaging and
+DynamoDB and Aurora for data persistence
+●
+Developed scalable, event-driven microservices using Python with
+enterprise-grade tooling
+●
+Collaborated in an agile environment to deliver high-quality, well-
+tested code across backend and frontend modules
+●
+Developed and integrated custom SDKs to ensure robust system
+connectivity and precise requirements implementation
+●
+Successfully developed MVP for innovative SaaS product using
+Django and React
+●
+Architected robust solutions leveraging Apache-based technologies●
+Led multiple proof-of-concept demonstrations resulting in
+successful product launch
+●
+Implemented scalable backend infrastructure with focus on
+performance and reliability
+●
+Collaborated with senior development team on diverse client
+projects
+●
+amitai1997@gmail.com
++972-52-4898353
+Ramat Gan Israel
+https://www.linkedin.com/in/amitai-
+s-049566123/
+Skills
+Python●
+AWS●
+AI agents●
+JavaScript●
+Cloud●
+DevOps●
+Rest API●
+Architecture●
+Django●
+Flask●
+Node.js●
+AWS CDK●
+Docker●
+Kubernetes●
+Linux●
+Infrastructure as Code (IaC)●
+CI/CD Pipelines●
+SQL and NoSQL●
+PostgreSQL●
+MongoDB●
+Opslabs (Acquired by Deloitte) - Part Time Software Developer
+01/2021 - 07/2022
+I. D.F. -Mamram - Fullstack (Backend-Oriented) Software Developer
+01/2019 - 07/2022
+Demonstrated exceptional adaptability across multiple
+technological domains
+●
+Rapidly delivered viable solutions for small to medium-sized client
+requirements
+●
+Took full ownership of end-to-end feature development from
+concept to deployment
+●
+Conducted specialized AWS-focused development●
+Performed in-depth research to specify tailored technological
+features
+●
+Supported enterprise-level technological innovation●
+Developed backend-focused solutions using Python and React●
+Developed RESTful APIs application handling secure data
+management
+●
+Created advanced monitoring system similar to DataDog●
+Built automated CI/CD pipelines using GitLab CI, enabling daily
+deployments
+●
+Implemented automated testing and code quality checks●
+Redis●
+ORM●
+React●
+Testing●
+DataDog●
+Microservices●
+Event-Driven Design●
+Agile & Scrum●
+SaaS Development●
+Education
+2019
+IDF. -BASMACH- Military School of
+Computer Science
+2017
+10 Study Units in Computer Science
+High School Diploma
+2016
+Hackeru
+Fullstack Development

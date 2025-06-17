@@ -64,6 +64,12 @@ class PDFMonitor {
     // Debug mode
     this.debugMode = true;
     
+    // Event listener references for cleanup
+    this._inputChangeListeners = new Map();
+    this._formSubmitListeners = new Map();
+    this._buttonClickListeners = new Map();
+    this._currentEscHandler = null; // Store the current Escape key handler
+    
     logger.log('PDF Monitor initializing');
     this.init();
   }
@@ -951,11 +957,28 @@ class PDFMonitor {
           sendResponse({ success: true });
           break;
           
+        case 'extension_reloaded':
+          // Extension was reloaded, reinitialize
+          logger.log('Extension was reloaded, reinitializing');
+          this.init();
+          sendResponse({ success: true });
+          break;
+          
         default:
+          logger.log('Unhandled message type:', message.type);
           sendResponse({ success: false, error: 'Unknown message type' });
       }
     } catch (error) {
       logger.error('Error handling message', { error: error.message });
+      
+      // Show error message to user for context invalidation errors
+      if (error.message.includes('Extension context') || 
+          error.message.includes('invalidated') ||
+          error.message.includes('destroyed')) {
+        // Use the standalone error function if this is a context error
+        showStandaloneError('PDF Scanner extension error. Please refresh the page.');
+      }
+      
       sendResponse({ success: false, error: error.message });
     }
     
@@ -992,38 +1015,41 @@ class PDFMonitor {
    */
   showSecretWarning(filename, result) {
     try {
-      // Remove any existing indicators
-      this.removeExistingIndicators();
+      logger.log('Showing secret warning for file:', filename, result);
       
-      // Create warning element - full modal style for maximum visibility
+      // Remove any existing warnings
+      this.removeExistingIndicators();
+      this.removeExistingSecurityWarnings();
+      
+      // Create warning element
       const warningEl = document.createElement('div');
-      warningEl.id = 'pdf-scanner-indicator';
+      warningEl.id = 'pdf-scanner-security-warning';
       warningEl.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 99999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       `;
       
-      // Create modal content
+      // Create modal element
       const modalEl = document.createElement('div');
       modalEl.style.cssText = `
         background-color: white;
-        color: #333;
         border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        width: 90%;
-        max-width: 500px;
-        max-height: 90vh;
-        overflow-y: auto;
-        padding: 0;
+        width: 500px;
+        max-width: 90%;
+        max-height: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       `;
       
       // Create header
@@ -1032,11 +1058,10 @@ class PDFMonitor {
         background-color: #d32f2f;
         color: white;
         padding: 16px 24px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
         display: flex;
         align-items: center;
         gap: 12px;
+        position: relative;
       `;
       
       // Create icon
@@ -1055,14 +1080,37 @@ class PDFMonitor {
         font-weight: 600;
       `;
       
+      // Create close button
+      const closeBtn = document.createElement('div');
+      closeBtn.innerHTML = '✕';
+      closeBtn.style.cssText = `
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        font-size: 18px;
+        cursor: pointer;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+      `;
+      closeBtn.addEventListener('click', () => {
+        warningEl.remove();
+      });
+      
       // Assemble header
       headerEl.appendChild(iconEl);
       headerEl.appendChild(titleEl);
+      headerEl.appendChild(closeBtn);
       
       // Create content area
       const contentEl = document.createElement('div');
       contentEl.style.cssText = `
         padding: 24px;
+        overflow-y: auto;
+        color: #333;
       `;
       
       // Create message
@@ -1071,6 +1119,7 @@ class PDFMonitor {
       messageEl.style.cssText = `
         margin: 0 0 20px 0;
         line-height: 1.5;
+        color: #333;
       `;
       
       // Create findings section
@@ -1080,6 +1129,7 @@ class PDFMonitor {
         padding: 16px;
         border-radius: 4px;
         margin-bottom: 20px;
+        color: #333;
       `;
       
       // Create findings title
@@ -1088,6 +1138,7 @@ class PDFMonitor {
       findingsTitleEl.style.cssText = `
         font-weight: bold;
         margin-bottom: 8px;
+        color: #333;
       `;
       findingsEl.appendChild(findingsTitleEl);
       
@@ -1096,21 +1147,58 @@ class PDFMonitor {
       findingsListEl.style.cssText = `
         margin: 0;
         padding-left: 20px;
+        color: #333;
       `;
       
       // Add findings
       if (result.findings && result.findings.length > 0) {
-        result.findings.forEach(finding => {
+        // Filter out generic non-informative findings that just show counts
+        const meaningfulFindings = result.findings.filter(finding => {
+          // Skip findings that are just showing detection counts
+          const isGenericCount = finding.value && finding.value.includes('detection(s)') && 
+                               (finding.type === 'Language Detector' || 
+                                finding.type === 'Sensitive Data' || 
+                                finding.type === 'Token Limitation');
+          return !isGenericCount;
+        });
+        
+        meaningfulFindings.forEach(finding => {
           const findingEl = document.createElement('li');
-          findingEl.textContent = `${finding.type} (${Math.round(finding.confidence * 100)}% confidence)`;
-          if (finding.location) {
-            findingEl.textContent += ` at ${finding.location}`;
+          
+          // Create more detailed finding information
+          if (finding.type === 'Secret' && finding.value) {
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}` + 
+              (finding.entity_type ? ` <em>(${finding.entity_type})</em>` : '') +
+              (finding.category ? ` <em>${finding.category}</em>` : '');
+          } else if (finding.type === 'URL') {
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
+          } else if (finding.value && !finding.value.includes('detection(s)')) {
+            // Show the actual value if available and not just a count
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
+          } else {
+            // Skip non-informative findings
+            return;
           }
+          
+          findingEl.style.cssText = `
+            margin-bottom: 8px;
+            color: #333;
+          `;
+          
           findingsListEl.appendChild(findingEl);
         });
+        
+        // If all findings were filtered out, add a generic message
+        if (findingsListEl.children.length === 0) {
+          const findingEl = document.createElement('li');
+          findingEl.textContent = 'Potential sensitive information detected';
+          findingEl.style.cssText = `color: #333;`;
+          findingsListEl.appendChild(findingEl);
+        }
       } else {
         const findingEl = document.createElement('li');
         findingEl.textContent = 'Potential sensitive information detected';
+        findingEl.style.cssText = `color: #333;`;
         findingsListEl.appendChild(findingEl);
       }
       
@@ -1118,74 +1206,9 @@ class PDFMonitor {
       contentEl.appendChild(messageEl);
       contentEl.appendChild(findingsEl);
       
-      // Create actions area
-      const actionsEl = document.createElement('div');
-      actionsEl.style.cssText = `
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
-        padding: 16px 24px;
-        border-top: 1px solid #eee;
-      `;
-      
-      // Create dismiss button
-      const dismissBtn = document.createElement('button');
-      dismissBtn.textContent = 'Proceed Anyway';
-      dismissBtn.style.cssText = `
-        background-color: transparent;
-        border: 1px solid #ccc;
-        color: #333;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-      `;
-      dismissBtn.addEventListener('click', () => {
-        warningEl.remove();
-      });
-      
-      // Create block button
-      const blockBtn = document.createElement('button');
-      blockBtn.textContent = "Don't Upload";
-      blockBtn.style.cssText = `
-        background-color: #d32f2f;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-      `;
-      blockBtn.addEventListener('click', () => {
-        // Try to clear any file inputs on the page
-        const fileInputs = document.querySelectorAll('input[type="file"]');
-        fileInputs.forEach(input => {
-          try {
-            input.value = '';
-            
-            // Dispatch change event
-            const changeEvent = new Event('change', { bubbles: true });
-            input.dispatchEvent(changeEvent);
-          } catch (e) {
-            logger.error('Error clearing file input', e);
-          }
-        });
-        
-        warningEl.remove();
-        
-        // Show confirmation
-        this.showSafeFileIndicator(filename, 'Upload cancelled');
-      });
-      
-      // Assemble actions
-      actionsEl.appendChild(dismissBtn);
-      actionsEl.appendChild(blockBtn);
-      
       // Assemble modal
       modalEl.appendChild(headerEl);
       modalEl.appendChild(contentEl);
-      modalEl.appendChild(actionsEl);
       
       // Add modal to warning element
       warningEl.appendChild(modalEl);
@@ -1196,11 +1219,16 @@ class PDFMonitor {
       // Add escape key handler to dismiss
       const escHandler = (e) => {
         if (e.key === 'Escape') {
-          warningEl.remove();
+          // Ensure all related warning elements are removed
+          this.removeExistingSecurityWarnings();
           document.removeEventListener('keydown', escHandler);
         }
       };
+      
+      // Remove any existing escape handlers first to avoid duplicates
+      document.removeEventListener('keydown', this._currentEscHandler);
       document.addEventListener('keydown', escHandler);
+      this._currentEscHandler = escHandler; // Store reference to current handler
       
       // No auto-remove for security warnings - user must take action
       
@@ -1217,14 +1245,39 @@ class PDFMonitor {
   sendMessage(message) {
     return new Promise((resolve, reject) => {
       try {
+        // Check if chrome.runtime is available
+        if (!chrome || !chrome.runtime) {
+          // Extension context might be invalid or not fully loaded
+          return reject(new Error('Extension context unavailable'));
+        }
+        
         chrome.runtime.sendMessage(message, response => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve(response);
+          // Check immediately for last error to catch context invalidation
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            if (runtimeError.message.includes('context invalidated')) {
+              // Handle context invalidated error specially - this can happen during extension reloads
+              this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+              console.error('[PDF Scanner] Extension context invalidated. The extension may have been reloaded.');
+              return reject(new Error('Extension context invalidated'));
+            }
+            return reject(runtimeError);
           }
+          
+          if (!response) {
+            return reject(new Error('No response received from background script'));
+          }
+          
+          resolve(response);
         });
       } catch (error) {
+        // Show a more user-friendly error
+        if (error.message.includes('Extension context') || 
+            error.message.includes('invalidated') ||
+            error.message.includes('destroyed')) {
+          this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+          console.error('[PDF Scanner] Extension context error:', error);
+        }
         reject(error);
       }
     });
@@ -1257,6 +1310,20 @@ class PDFMonitor {
       return response.result;
     } catch (error) {
       logger.error('Error scanning PDF immediately:', error);
+      
+      // Handle context invalidated errors specially
+      if (error.message.includes('Extension context') || 
+          error.message.includes('invalidated') || 
+          error.message.includes('unavailable')) {
+        this.showScanErrorIndicator(
+          file.name,
+          'Extension was reloaded or is unavailable. Please refresh the page and try again.'
+        );
+      } else {
+        // For other errors, show a generic scan error
+        this.showScanErrorIndicator(file.name);
+      }
+      
       throw error;
     }
   }
@@ -1439,8 +1506,9 @@ class PDFMonitor {
   /**
    * Show indicator for scan error
    * @param {string} filename - Name of file with scan error
+   * @param {string} [errorMessage] - Optional custom error message
    */
-  showScanErrorIndicator(filename) {
+  showScanErrorIndicator(filename, errorMessage) {
     try {
       // Remove any existing indicators
       this.removeExistingIndicators();
@@ -1475,7 +1543,11 @@ class PDFMonitor {
       
       // Create message
       const messageEl = document.createElement('div');
-      messageEl.textContent = `Error scanning "${filename}". Proceeding with caution.`;
+      if (errorMessage) {
+        messageEl.textContent = errorMessage;
+      } else {
+        messageEl.textContent = `Error scanning "${filename}". Proceeding with caution.`;
+      }
       
       // Create close button
       const closeEl = document.createElement('button');
@@ -1501,12 +1573,7 @@ class PDFMonitor {
       // Add to page
       document.body.appendChild(indicatorEl);
       
-      // Auto-remove after 5 seconds
-      setTimeout(() => {
-        if (document.body.contains(indicatorEl)) {
-          indicatorEl.remove();
-        }
-      }, 5000);
+      // No auto-remove for error messages - user must acknowledge
     } catch (error) {
       logger.error('Error showing scan error indicator:', error);
     }
@@ -1525,11 +1592,115 @@ class PDFMonitor {
       logger.error('Error removing existing indicators:', error);
     }
   }
+  
+  /**
+   * Remove any existing security warning popups
+   */
+  removeExistingSecurityWarnings() {
+    try {
+      const existingWarning = document.getElementById('pdf-scanner-security-warning');
+      if (existingWarning) {
+        existingWarning.remove();
+      }
+      
+      // Also look for any elements that might be security warnings without IDs
+      const possibleWarnings = document.querySelectorAll('div[style*="z-index: 10000"]');
+      possibleWarnings.forEach(el => {
+        if (el.innerHTML.includes('Security Risk Detected')) {
+          el.remove();
+        }
+      });
+    } catch (error) {
+      logger.error('Error removing existing security warnings:', error);
+    }
+  }
+}
+
+/**
+ * Show a standalone error message when the extension has problems initializing
+ * This is a utility function outside the class in case we can't instantiate the class
+ */
+function showStandaloneError(message) {
+  try {
+    // Create indicator element
+    const indicatorEl = document.createElement('div');
+    indicatorEl.id = 'pdf-scanner-indicator';
+    indicatorEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      max-width: 80%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    `;
+    
+    // Create icon
+    const iconEl = document.createElement('div');
+    iconEl.innerHTML = '⚠️';
+    iconEl.style.cssText = `font-size: 20px;`;
+    
+    // Create message
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message || 'PDF Scanner extension encountered an error. Please refresh the page.';
+    
+    // Create close button
+    const closeEl = document.createElement('button');
+    closeEl.textContent = '×';
+    closeEl.style.cssText = `
+      background: none;
+      border: none;
+      color: #856404;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0 0 0 10px;
+      margin-left: auto;
+    `;
+    closeEl.addEventListener('click', () => indicatorEl.remove());
+    
+    // Assemble UI
+    indicatorEl.appendChild(iconEl);
+    indicatorEl.appendChild(messageEl);
+    indicatorEl.appendChild(closeEl);
+    
+    // Add to page
+    document.body.appendChild(indicatorEl);
+  } catch (error) {
+    console.error('[PDF Scanner] Error showing standalone error:', error);
+  }
 }
 
 // Initialize the monitor when the page is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new PDFMonitor());
-} else {
-  new PDFMonitor();
+try {
+  if (!chrome || !chrome.runtime) {
+    // Chrome API not available - show standalone error
+    showStandaloneError('PDF Scanner extension cannot access Chrome API. Please reload the page.');
+  } else {
+    // Check if we can send a simple test message to verify extension context
+    chrome.runtime.sendMessage({type: 'ping'}, response => {
+      if (chrome.runtime.lastError) {
+        showStandaloneError('PDF Scanner extension not responding. Extension may need to be reloaded.');
+        console.error('[PDF Scanner] Extension context error:', chrome.runtime.lastError);
+        return;
+      }
+      
+      // Context is valid, initialize normally
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => new PDFMonitor());
+      } else {
+        new PDFMonitor();
+      }
+    });
+  }
+} catch (error) {
+  console.error('[PDF Scanner] Error initializing PDF Monitor:', error);
+  showStandaloneError('Error initializing PDF Scanner. Please refresh the page.');
 }
