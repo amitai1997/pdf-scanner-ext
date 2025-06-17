@@ -60,7 +60,7 @@ class PDFScannerBackground {
     
     // URLs based on environment
     this.BACKEND_URL = this.isDevelopment 
-      ? 'http://localhost:8080' 
+      ? 'http://localhost:3001' 
       : 'https://api.your-production-backend.com';
     
     this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'; // From assignment
@@ -524,11 +524,15 @@ class PDFScannerBackground {
         }
       }
 
-      // For Day 2, we'll use local mock backend
-      // In production, this would call the real backend service
-      const scanResult = await this.scanWithMockBackend(blob, filename);
-
-      return scanResult;
+      // For Day 3, we'll use the real backend service
+      try {
+        const formData = this.createFormData(blob, filename);
+        const scanResult = await this.sendToLocalBackend(formData, filename);
+        return scanResult;
+      } catch (error) {
+        logger.error('Backend scan failed, falling back to mock:', error);
+        return this.scanWithMockBackend(blob, filename);
+      }
     } catch (error) {
       logger.error('PDF scan error:', error);
       throw new Error(`Failed to scan PDF: ${error.message}`);
@@ -609,8 +613,11 @@ class PDFScannerBackground {
       const response = await fetch(`${this.BACKEND_URL}/scan`, {
         method: 'POST',
         body: formData,
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
-          'X-App-ID': this.APP_ID
+          'X-App-ID': this.APP_ID,
+          'Accept': 'application/json'
         }
       });
       
@@ -621,9 +628,33 @@ class PDFScannerBackground {
       const result = await response.json();
       logger.log('Local backend scan result:', result);
       
-      return result;
+      // Map findings to ensure they have all needed properties
+      if (result.findings && Array.isArray(result.findings)) {
+        // Keep the full findings data from the API instead of mapping/transforming it
+        // This ensures all details like entity_type, category, and value are preserved
+        // We'll handle display formatting in the content script
+      }
+      
+      return {
+        secrets: result.secrets || false,
+        findings: result.findings || [],
+        action: result.action || 'allow',
+        scannedAt: result.scannedAt || new Date().toISOString(),
+      };
     } catch (error) {
       logger.error('Local backend scan failed:', error);
+      
+      // More detailed error logging with fallback
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        logger.error('Network error: Make sure the backend service is running at', this.BACKEND_URL);
+        
+        // Fallback to simulation in dev mode
+        if (this.isDevelopment) {
+          logger.warn('Falling back to simulation since backend is unavailable');
+          return this.scanWithMockBackend(formData.get('pdf'), fileName);
+        }
+      }
+      
       throw error;
     }
   }
@@ -679,6 +710,19 @@ class PDFScannerBackground {
   }
 
   // Utility method to log scan results (for observability)
+  /**
+   * Helper to create form data for the backend
+   * @param {Blob} blob - PDF blob
+   * @param {string} filename - PDF filename
+   * @returns {FormData} Form data for backend request
+   */
+  createFormData(blob, filename) {
+    const formData = new FormData();
+    formData.append('pdf', blob, filename);
+    formData.append('filename', filename);
+    return formData;
+  }
+  
   async logScanResult(fileName, result) {
     const logEntry = {
       timestamp: new Date().toISOString(),

@@ -992,38 +992,36 @@ class PDFMonitor {
    */
   showSecretWarning(filename, result) {
     try {
-      // Remove any existing indicators
-      this.removeExistingIndicators();
+      logger.log('Showing secret warning for file:', filename, result);
       
-      // Create warning element - full modal style for maximum visibility
+      // Create warning element
       const warningEl = document.createElement('div');
-      warningEl.id = 'pdf-scanner-indicator';
       warningEl.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.7);
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 99999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       `;
       
-      // Create modal content
+      // Create modal element
       const modalEl = document.createElement('div');
       modalEl.style.cssText = `
         background-color: white;
-        color: #333;
         border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        width: 90%;
-        max-width: 500px;
-        max-height: 90vh;
-        overflow-y: auto;
-        padding: 0;
+        width: 500px;
+        max-width: 90%;
+        max-height: 90%;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       `;
       
       // Create header
@@ -1032,11 +1030,10 @@ class PDFMonitor {
         background-color: #d32f2f;
         color: white;
         padding: 16px 24px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
         display: flex;
         align-items: center;
         gap: 12px;
+        position: relative;
       `;
       
       // Create icon
@@ -1055,14 +1052,36 @@ class PDFMonitor {
         font-weight: 600;
       `;
       
+      // Create close button
+      const closeBtn = document.createElement('div');
+      closeBtn.innerHTML = '✕';
+      closeBtn.style.cssText = `
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        font-size: 18px;
+        cursor: pointer;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: white;
+      `;
+      closeBtn.addEventListener('click', () => {
+        warningEl.remove();
+      });
+      
       // Assemble header
       headerEl.appendChild(iconEl);
       headerEl.appendChild(titleEl);
+      headerEl.appendChild(closeBtn);
       
       // Create content area
       const contentEl = document.createElement('div');
       contentEl.style.cssText = `
         padding: 24px;
+        overflow-y: auto;
       `;
       
       // Create message
@@ -1102,10 +1121,28 @@ class PDFMonitor {
       if (result.findings && result.findings.length > 0) {
         result.findings.forEach(finding => {
           const findingEl = document.createElement('li');
-          findingEl.textContent = `${finding.type} (${Math.round(finding.confidence * 100)}% confidence)`;
-          if (finding.location) {
-            findingEl.textContent += ` at ${finding.location}`;
+          
+          // Create more detailed finding information
+          if (finding.type === 'Secret' && finding.value) {
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}` + 
+              (finding.entity_type ? ` <em>(${finding.entity_type})</em>` : '') +
+              (finding.category ? ` <em>${finding.category}</em>` : '');
+          } else if (finding.value) {
+            // Show the actual value if available
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
+          } else {
+            findingEl.innerHTML = `<strong>${finding.type}</strong>`;
+            
+            // Add severity if available
+            if (finding.severity) {
+              findingEl.innerHTML += ` <em>(${finding.severity})</em>`;
+            }
           }
+          
+          findingEl.style.cssText = `
+            margin-bottom: 8px;
+          `;
+          
           findingsListEl.appendChild(findingEl);
         });
       } else {
@@ -1118,74 +1155,9 @@ class PDFMonitor {
       contentEl.appendChild(messageEl);
       contentEl.appendChild(findingsEl);
       
-      // Create actions area
-      const actionsEl = document.createElement('div');
-      actionsEl.style.cssText = `
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
-        padding: 16px 24px;
-        border-top: 1px solid #eee;
-      `;
-      
-      // Create dismiss button
-      const dismissBtn = document.createElement('button');
-      dismissBtn.textContent = 'Proceed Anyway';
-      dismissBtn.style.cssText = `
-        background-color: transparent;
-        border: 1px solid #ccc;
-        color: #333;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-      `;
-      dismissBtn.addEventListener('click', () => {
-        warningEl.remove();
-      });
-      
-      // Create block button
-      const blockBtn = document.createElement('button');
-      blockBtn.textContent = "Don't Upload";
-      blockBtn.style.cssText = `
-        background-color: #d32f2f;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-      `;
-      blockBtn.addEventListener('click', () => {
-        // Try to clear any file inputs on the page
-        const fileInputs = document.querySelectorAll('input[type="file"]');
-        fileInputs.forEach(input => {
-          try {
-            input.value = '';
-            
-            // Dispatch change event
-            const changeEvent = new Event('change', { bubbles: true });
-            input.dispatchEvent(changeEvent);
-          } catch (e) {
-            logger.error('Error clearing file input', e);
-          }
-        });
-        
-        warningEl.remove();
-        
-        // Show confirmation
-        this.showSafeFileIndicator(filename, 'Upload cancelled');
-      });
-      
-      // Assemble actions
-      actionsEl.appendChild(dismissBtn);
-      actionsEl.appendChild(blockBtn);
-      
       // Assemble modal
       modalEl.appendChild(headerEl);
       modalEl.appendChild(contentEl);
-      modalEl.appendChild(actionsEl);
       
       // Add modal to warning element
       warningEl.appendChild(modalEl);
