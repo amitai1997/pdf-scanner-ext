@@ -86,6 +86,12 @@ class PDFScannerBackground {
     
     this.processedRequestIds = new Set();
     this.processedFileHashes = new Set();
+    this.scansInFlight       = new Map();
+
+    chrome.alarms.create('clearHashCache', { periodInMinutes: 24 * 60 });
+    chrome.alarms.onAlarm.addListener(a => {
+      if (a.name === 'clearHashCache') this.processedFileHashes.clear();
+    });
     
     this.init();
   }
@@ -244,6 +250,13 @@ class PDFScannerBackground {
    */
   handleWebRequest(details) {
     try {
+      // ── Request‑level deduplication ──
+      // Skip if we've already processed this requestId
+      if (this.processedRequestIds.has(details.requestId)) {
+        return;          // ignore duplicate onBeforeRequest events
+      }
+      this.processedRequestIds.add(details.requestId);
+
       // Skip non-POST requests
       if (details.method !== 'POST') {
         return;
@@ -315,15 +328,16 @@ class PDFScannerBackground {
         }
         
         case 'scan': {
-          // This is the immediate scan request from content script
           logger.log('Immediate scan request for:', message.filename);
           const result = await this.scanPDF(message);
-          
-          // If secrets found and we have a tab ID, show warning in that tab
-          if (result.secrets && sender.tab && sender.tab.id) {
+
+          // ── Decide whether we must alert the user ──
+          const incidentDetected = result.secrets === true;
+
+          if (incidentDetected && sender.tab && sender.tab.id) {
             this.showWarningInTab(sender.tab.id, message.filename, result);
           }
-          
+
           sendResponse({ success: true, result });
           break;
         }
@@ -425,10 +439,16 @@ class PDFScannerBackground {
   async handleInterceptedPDF(message) {
     try {
       const { fileData, filename, fileSize, requestId } = message;
+      // ── Zero‑byte guard ──
+      if (fileSize === 0) {
+        logger.warn('[PDF Scanner] Skipping 0‑byte upload:', filename);
+        return;               // do not hash, do not scan
+      }
       const fileHash = await this._computeHash(fileData);
       logger.log(`Scanning file: ${filename}, hash: ${fileHash}, base64 length: ${fileData.length}`);
-      if (this.processedFileHashes.has(fileHash)) {
-        logger.log('Duplicate scan prevented for file hash:', fileHash);
+      if (fileSize === 0 && this.processedFileHashes.has(fileHash)) {
+        // We use the cache **only** to suppress the duplicate empty payload
+        logger.log('Duplicate empty upload skipped for hash:', fileHash);
         return;
       }
       this.processedFileHashes.add(fileHash);
@@ -500,9 +520,15 @@ class PDFScannerBackground {
 
   async scanPDF(message) {
     const { fileData, filename, fileSize } = message;
+    // ── single‑shot execution guard ──
+    if (this.scansInFlight.has(filename)) {
+      logger.log('Scan already in flight, awaiting result for:', filename);
+      return await this.scansInFlight.get(filename);
+    }
 
-    logger.log(`Scanning PDF: ${filename} (${fileSize} bytes)`);
-    logger.log('File data type:', typeof fileData);
+    let _resolveScan, _rejectScan;
+    const scanPromise = new Promise((res, rej) => { _resolveScan = res; _rejectScan = rej; });
+    this.scansInFlight.set(filename, scanPromise);
 
     try {
       // Convert data to blob based on format
@@ -559,16 +585,22 @@ class PDFScannerBackground {
 
       // For Day 3, we'll use the real backend service
       try {
-        const formData = this.createFormData(blob, filename);
-        const scanResult = await this.sendToLocalBackend(formData, filename);
-        return scanResult;
+        const formData   = this.createFormData(blob, filename);
+        const res = await this.sendToLocalBackend(formData, filename);
+        _resolveScan(res);
+        return res;
       } catch (error) {
-        logger.error('Backend scan failed, falling back to mock:', error);
-        return this.scanWithMockBackend(blob, filename);
+        logger.error('Backend scan failed – aborting scan:', error);
+        _resolveScan(error);
+        throw error;                       // ⇦ bubble up
       }
     } catch (error) {
       logger.error('PDF scan error:', error);
+      if (_rejectScan) _rejectScan(error);
       throw new Error(`Failed to scan PDF: ${error.message}`);
+    }
+    finally {
+      this.scansInFlight.delete(filename);
     }
   }
 
@@ -676,17 +708,6 @@ class PDFScannerBackground {
       };
     } catch (error) {
       logger.error('Local backend scan failed:', error);
-      
-      // More detailed error logging with fallback
-      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-        logger.error('Network error: Make sure the backend service is running at', this.BACKEND_URL);
-        
-        // Fallback to simulation in dev mode
-        if (this.isDevelopment) {
-          logger.warn('Falling back to simulation since backend is unavailable');
-          return this.scanWithMockBackend(formData.get('pdf'), fileName);
-        }
-      }
       
       throw error;
     }
