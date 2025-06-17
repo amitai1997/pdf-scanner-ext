@@ -951,11 +951,28 @@ class PDFMonitor {
           sendResponse({ success: true });
           break;
           
+        case 'extension_reloaded':
+          // Extension was reloaded, reinitialize
+          logger.log('Extension was reloaded, reinitializing');
+          this.init();
+          sendResponse({ success: true });
+          break;
+          
         default:
+          logger.log('Unhandled message type:', message.type);
           sendResponse({ success: false, error: 'Unknown message type' });
       }
     } catch (error) {
       logger.error('Error handling message', { error: error.message });
+      
+      // Show error message to user for context invalidation errors
+      if (error.message.includes('Extension context') || 
+          error.message.includes('invalidated') ||
+          error.message.includes('destroyed')) {
+        // Use the standalone error function if this is a context error
+        showStandaloneError('PDF Scanner extension error. Please refresh the page.');
+      }
+      
       sendResponse({ success: false, error: error.message });
     }
     
@@ -1198,14 +1215,39 @@ class PDFMonitor {
   sendMessage(message) {
     return new Promise((resolve, reject) => {
       try {
+        // Check if chrome.runtime is available
+        if (!chrome || !chrome.runtime) {
+          // Extension context might be invalid or not fully loaded
+          return reject(new Error('Extension context unavailable'));
+        }
+        
         chrome.runtime.sendMessage(message, response => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-          } else {
-            resolve(response);
+          // Check immediately for last error to catch context invalidation
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            if (runtimeError.message.includes('context invalidated')) {
+              // Handle context invalidated error specially - this can happen during extension reloads
+              this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+              console.error('[PDF Scanner] Extension context invalidated. The extension may have been reloaded.');
+              return reject(new Error('Extension context invalidated'));
+            }
+            return reject(runtimeError);
           }
+          
+          if (!response) {
+            return reject(new Error('No response received from background script'));
+          }
+          
+          resolve(response);
         });
       } catch (error) {
+        // Show a more user-friendly error
+        if (error.message.includes('Extension context') || 
+            error.message.includes('invalidated') ||
+            error.message.includes('destroyed')) {
+          this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+          console.error('[PDF Scanner] Extension context error:', error);
+        }
         reject(error);
       }
     });
@@ -1238,6 +1280,20 @@ class PDFMonitor {
       return response.result;
     } catch (error) {
       logger.error('Error scanning PDF immediately:', error);
+      
+      // Handle context invalidated errors specially
+      if (error.message.includes('Extension context') || 
+          error.message.includes('invalidated') || 
+          error.message.includes('unavailable')) {
+        this.showScanErrorIndicator(
+          file.name,
+          'Extension was reloaded or is unavailable. Please refresh the page and try again.'
+        );
+      } else {
+        // For other errors, show a generic scan error
+        this.showScanErrorIndicator(file.name);
+      }
+      
       throw error;
     }
   }
@@ -1420,8 +1476,9 @@ class PDFMonitor {
   /**
    * Show indicator for scan error
    * @param {string} filename - Name of file with scan error
+   * @param {string} [errorMessage] - Optional custom error message
    */
-  showScanErrorIndicator(filename) {
+  showScanErrorIndicator(filename, errorMessage) {
     try {
       // Remove any existing indicators
       this.removeExistingIndicators();
@@ -1456,7 +1513,11 @@ class PDFMonitor {
       
       // Create message
       const messageEl = document.createElement('div');
-      messageEl.textContent = `Error scanning "${filename}". Proceeding with caution.`;
+      if (errorMessage) {
+        messageEl.textContent = errorMessage;
+      } else {
+        messageEl.textContent = `Error scanning "${filename}". Proceeding with caution.`;
+      }
       
       // Create close button
       const closeEl = document.createElement('button');
@@ -1482,12 +1543,7 @@ class PDFMonitor {
       // Add to page
       document.body.appendChild(indicatorEl);
       
-      // Auto-remove after 5 seconds
-      setTimeout(() => {
-        if (document.body.contains(indicatorEl)) {
-          indicatorEl.remove();
-        }
-      }, 5000);
+      // No auto-remove for error messages - user must acknowledge
     } catch (error) {
       logger.error('Error showing scan error indicator:', error);
     }
@@ -1508,9 +1564,91 @@ class PDFMonitor {
   }
 }
 
+/**
+ * Show a standalone error message when the extension has problems initializing
+ * This is a utility function outside the class in case we can't instantiate the class
+ */
+function showStandaloneError(message) {
+  try {
+    // Create indicator element
+    const indicatorEl = document.createElement('div');
+    indicatorEl.id = 'pdf-scanner-indicator';
+    indicatorEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+      max-width: 80%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    `;
+    
+    // Create icon
+    const iconEl = document.createElement('div');
+    iconEl.innerHTML = '⚠️';
+    iconEl.style.cssText = `font-size: 20px;`;
+    
+    // Create message
+    const messageEl = document.createElement('div');
+    messageEl.textContent = message || 'PDF Scanner extension encountered an error. Please refresh the page.';
+    
+    // Create close button
+    const closeEl = document.createElement('button');
+    closeEl.textContent = '×';
+    closeEl.style.cssText = `
+      background: none;
+      border: none;
+      color: #856404;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0 0 0 10px;
+      margin-left: auto;
+    `;
+    closeEl.addEventListener('click', () => indicatorEl.remove());
+    
+    // Assemble UI
+    indicatorEl.appendChild(iconEl);
+    indicatorEl.appendChild(messageEl);
+    indicatorEl.appendChild(closeEl);
+    
+    // Add to page
+    document.body.appendChild(indicatorEl);
+  } catch (error) {
+    console.error('[PDF Scanner] Error showing standalone error:', error);
+  }
+}
+
 // Initialize the monitor when the page is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new PDFMonitor());
-} else {
-  new PDFMonitor();
+try {
+  if (!chrome || !chrome.runtime) {
+    // Chrome API not available - show standalone error
+    showStandaloneError('PDF Scanner extension cannot access Chrome API. Please reload the page.');
+  } else {
+    // Check if we can send a simple test message to verify extension context
+    chrome.runtime.sendMessage({type: 'ping'}, response => {
+      if (chrome.runtime.lastError) {
+        showStandaloneError('PDF Scanner extension not responding. Extension may need to be reloaded.');
+        console.error('[PDF Scanner] Extension context error:', chrome.runtime.lastError);
+        return;
+      }
+      
+      // Context is valid, initialize normally
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => new PDFMonitor());
+      } else {
+        new PDFMonitor();
+      }
+    });
+  }
+} catch (error) {
+  console.error('[PDF Scanner] Error initializing PDF Monitor:', error);
+  showStandaloneError('Error initializing PDF Scanner. Please refresh the page.');
 }

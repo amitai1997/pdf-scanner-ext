@@ -292,6 +292,13 @@ class PDFScannerBackground {
 
     try {
       switch (message.type) {
+        case 'ping': {
+          // Simple ping to check if extension is responsive
+          logger.log('Ping received from content script');
+          sendResponse({ success: true, message: 'pong' });
+          break;
+        }
+        
         case 'scan': {
           // This is the immediate scan request from content script
           logger.log('Immediate scan request for:', message.filename);
