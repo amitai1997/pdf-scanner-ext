@@ -87,11 +87,6 @@ class PDFScannerPopup {
     try {
       logger.log('Initializing PDF Scanner Popup');
       
-      // Show dev mode indicator if in development mode
-      if (this.isDevelopment) {
-        this.showDevelopmentModeIndicator();
-      }
-      
       // Bind event handlers
       this.bindEvents();
       
