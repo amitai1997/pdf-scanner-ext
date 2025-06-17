@@ -84,6 +84,9 @@ class PDFScannerBackground {
     logger.log(`Running in ${this.isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
     logger.log(`Using backend URL: ${this.BACKEND_URL}`);
     
+    this.processedRequestIds = new Set();
+    this.processedFileHashes = new Set();
+    
     this.init();
   }
 
@@ -422,6 +425,13 @@ class PDFScannerBackground {
   async handleInterceptedPDF(message) {
     try {
       const { fileData, filename, fileSize, requestId } = message;
+      const fileHash = await this._computeHash(fileData);
+      logger.log(`Scanning file: ${filename}, hash: ${fileHash}, base64 length: ${fileData.length}`);
+      if (this.processedFileHashes.has(fileHash)) {
+        logger.log('Duplicate scan prevented for file hash:', fileHash);
+        return;
+      }
+      this.processedFileHashes.add(fileHash);
       
       logger.log(`Intercepted PDF: ${filename} (${fileSize} bytes), ID: ${requestId}`);
       
@@ -714,18 +724,18 @@ class PDFScannerBackground {
 
     try {
       // Check if notifications are permitted
-      const permission = await chrome.notifications.create({
+      const notificationId = await chrome.notifications.create({
         type: 'basic',
-        // No custom icon, Chrome will use the extension's default icon
+        iconUrl: 'icons/icon.png', // Correct path for Chrome extension
         title: title || 'PDF Scanner',
         message: body || 'Scan completed',
       });
 
-      logger.log('Notification shown:', permission);
+      logger.log('Notification shown:', notificationId);
 
       // Auto-clear notification after 5 seconds
       setTimeout(() => {
-        chrome.notifications.clear(permission);
+        chrome.notifications.clear(notificationId);
       }, 5000);
     } catch (error) {
       logger.error('Failed to show notification:', error);
@@ -809,6 +819,65 @@ class PDFScannerBackground {
         message: `Secrets detected in PDF: ${filename}. Please check the file before uploading.`
       });
     }
+  }
+
+  /**
+   * Process a web request intercepted by the backup listener
+   * @param {Object} details - Request details
+   */
+  async processWebRequest(details) {
+    try {
+      logger.log('Processing intercepted web request', details.url);
+      // Extract PDF from the request body using FormDataParser
+      let pdfData = null;
+      if (details.requestBody && details.requestBody.raw && details.requestBody.raw.length > 0) {
+        const buffer = details.requestBody.raw[0].bytes;
+        // Try to extract PDF from multipart or JSON
+        pdfData = FormDataParser.extractPDFFromMultipart(buffer, details) ||
+                  FormDataParser.extractPDFFromJSON(buffer);
+      }
+      if (!pdfData) {
+        logger.log('No PDF found in intercepted web request');
+        return;
+      }
+      logger.log(`PDF extracted from web request: ${pdfData.filename} (${pdfData.size} bytes)`);
+      // Send the PDF for scanning (reuse handleInterceptedPDF logic)
+      await this.handleInterceptedPDF({
+        fileData: await this._blobToDataUrl(pdfData.blob),
+        filename: pdfData.filename,
+        fileSize: pdfData.size,
+        requestId: details.requestId || `webreq-${Date.now()}`
+      });
+    } catch (error) {
+      logger.error('Error in processWebRequest:', error);
+    }
+  }
+
+  /**
+   * Helper to convert Blob to data URL
+   */
+  async _blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /**
+   * Compute SHA-256 hash of a base64 string
+   */
+  async _computeHash(base64String) {
+    // Remove data URL prefix if present
+    const base64 = base64String.split(',')[1] || base64String;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 }
 

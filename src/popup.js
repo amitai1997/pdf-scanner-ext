@@ -77,7 +77,7 @@ class PDFScannerPopup {
     if (!this.statusText) logger.error('Missing element: .status-text');
     if (!this.scanCountElement) logger.error('Missing element: #scan-count');
     if (!this.viewLogsBtn) logger.error('Missing element: #view-logs');
-    if (!this.devBadgeContainer) logger.error('Missing element: #dev-badge-container');
+    if (!this.devBadgeContainer && this.checkDevelopment && this.checkDevelopment()) logger.warn('Dev badge container missing (dev mode only)');
   }
   
   /**
