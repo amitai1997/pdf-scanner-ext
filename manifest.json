@@ -18,7 +18,8 @@
     "storage",
     "downloads",
     "webRequest",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
 
   "host_permissions": [
@@ -27,7 +28,8 @@
     "https://*.openai.com/*",
     "https://*.claude.ai/*",
     "https://*.anthropic.com/*",
-    "http://localhost:8080/*"
+    "http://localhost:8080/*",
+    "http://localhost:3001/*"
   ],
 
   "content_security_policy": {
