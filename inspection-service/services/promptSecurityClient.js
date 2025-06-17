@@ -8,7 +8,8 @@ class PromptSecurityClient {
   constructor() {
     // Load API information from environment variables
     this.apiUrl = 'https://eu.prompt.security/api/protect';
-    this.appId = process.env.PROMPT_SECURITY_APP_ID;
+    // this.appId = process.env.PROMPT_SECURITY_APP_ID;
+    this.appId = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'; // For testing purposes, replace with actual env variable in production
 
     // Retry configuration
     this.maxRetries = 3;
