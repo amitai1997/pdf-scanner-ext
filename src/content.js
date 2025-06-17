@@ -1082,6 +1082,7 @@ class PDFMonitor {
       contentEl.style.cssText = `
         padding: 24px;
         overflow-y: auto;
+        color: #333;
       `;
       
       // Create message
@@ -1090,6 +1091,7 @@ class PDFMonitor {
       messageEl.style.cssText = `
         margin: 0 0 20px 0;
         line-height: 1.5;
+        color: #333;
       `;
       
       // Create findings section
@@ -1099,6 +1101,7 @@ class PDFMonitor {
         padding: 16px;
         border-radius: 4px;
         margin-bottom: 20px;
+        color: #333;
       `;
       
       // Create findings title
@@ -1107,6 +1110,7 @@ class PDFMonitor {
       findingsTitleEl.style.cssText = `
         font-weight: bold;
         margin-bottom: 8px;
+        color: #333;
       `;
       findingsEl.appendChild(findingsTitleEl);
       
@@ -1115,6 +1119,7 @@ class PDFMonitor {
       findingsListEl.style.cssText = `
         margin: 0;
         padding-left: 20px;
+        color: #333;
       `;
       
       // Add findings
@@ -1141,6 +1146,7 @@ class PDFMonitor {
           
           findingEl.style.cssText = `
             margin-bottom: 8px;
+            color: #333;
           `;
           
           findingsListEl.appendChild(findingEl);
@@ -1148,6 +1154,9 @@ class PDFMonitor {
       } else {
         const findingEl = document.createElement('li');
         findingEl.textContent = 'Potential sensitive information detected';
+        findingEl.style.cssText = `
+          color: #333;
+        `;
         findingsListEl.appendChild(findingEl);
       }
       
