@@ -869,12 +869,48 @@ class PDFScannerBackground {
    * Compute SHA-256 hash of a base64 string
    */
   async _computeHash(base64String) {
+    if (typeof base64String !== 'string' || !base64String) {
+      logger.warn('Cannot compute hash for invalid input.');
+      // Return SHA-256 of empty string for invalid input
+      return 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    }
     // Remove data URL prefix if present
-    const base64 = base64String.split(',')[1] || base64String;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    let base64 = base64String.split(',')[1] || base64String;
+
+    // ----- Robust base-64 normalisation & decoding -----
+    let normalised = base64
+      .replace(/^data:[^,]*,/, '')      // strip any data-URL header
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .trim();
+
+    try {
+      // Decode %xx escapes if present
+      normalised = decodeURIComponent(normalised);
+    } catch (_) { /* not URI-encoded – ignore */ }
+
+    // Keep only legal base-64 chars
+    normalised = normalised.replace(/[^A-Za-z0-9+/=]/g, '');
+
+    // Pad to multiple of 4
+    while (normalised.length % 4) {
+      normalised += '=';
+    }
+
+    let binaryString;
+    try {
+      binaryString = atob(normalised);
+    } catch (e) {
+      logger.warn('atob failed; hashing raw text instead', e);
+      // Hash the cleaned text itself (deterministic fallback)
+      const fallbackBytes = new TextEncoder().encode(normalised);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', fallbackBytes);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
     const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
     return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');

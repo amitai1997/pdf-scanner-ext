@@ -28,6 +28,43 @@ const promptSecurity = new PromptSecurityClient();
 // Create Express app
 const app = express();
 
+// Helper function to retry PDF parsing with exponential backoff
+async function extractPDFTextWithRetry(buffer, filename, maxRetries = 3) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`PDF parse attempt ${attempt} of ${maxRetries} for ${filename}`);
+      const data = await pdfParse(buffer);
+      
+      // Validate extracted text
+      if (!data.text || data.text.trim().length < 10) {
+        throw new Error('Extracted text too short or empty');
+      }
+      
+      console.log(`Successfully extracted ${data.text.length} characters on attempt ${attempt}`);
+      return {
+        text: data.text,
+        info: data.info,
+        numpages: data.numpages
+      };
+    } catch (error) {
+      lastError = error;
+      console.error(`PDF parse attempt ${attempt} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        // Wait before retrying (exponential backoff)
+        const delay = 100 * Math.pow(2, attempt - 1);
+        console.log(`Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  // All attempts failed
+  throw new AppError(`Failed to extract text from PDF after ${maxRetries} attempts: ${lastError.message}`, 500);
+}
+
 // Create debug directory if it doesn't exist
 const debugDir = path.join(__dirname, 'debug');
 if (!fs.existsSync(debugDir)) {
@@ -122,13 +159,16 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       console.log(`Saved debug file to ${debugFilePath}`);
     }
 
-    // Extract text from the PDF
+    // Extract text from the PDF with retry logic
     let extractedText = '';
+    let pdfData = null;
+    
     try {
-      const data = await pdfParse(req.file.buffer);
-      console.log(`PDF Info: ${req.file.originalname}, Version: ${data.info.PDFFormatVersion || 'unknown'}, Pages: ${data.numpages}`);
+      // Use the retry function
+      pdfData = await extractPDFTextWithRetry(req.file.buffer, req.file.originalname);
+      extractedText = pdfData.text;
       
-      extractedText = data.text || '';
+      console.log(`PDF Info: ${req.file.originalname}, Version: ${pdfData.info?.PDFFormatVersion || 'unknown'}, Pages: ${pdfData.numpages}`);
       
       if (NODE_ENV === 'development') {
         const timestamp = Date.now();
@@ -137,20 +177,28 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         fs.writeFileSync(textOutputPath, extractedText);
         console.log(`Extracted ${extractedText.length} characters of text`);
         console.log(`Text sample: ${extractedText.substring(0, 100)}...`);
-      }
-
-      if (extractedText.length < 10) {
-        console.warn('WARNING: Very little text extracted. Possible PDF parsing issue.');
         
-        // Fallback for text extraction
-        extractedText = req.file.originalname + '\n' + req.file.buffer.toString('utf8', 0, 1000);
+        // Log the full extracted text for debugging (truncate if very long)
+        console.log('--- FULL EXTRACTED TEXT START ---');
+        console.log(extractedText.length > 2000 ? extractedText.substring(0, 2000) + '\n...[truncated]' : extractedText);
+        console.log('--- FULL EXTRACTED TEXT END ---');
       }
-    } catch (pdfError) {
-      console.error('PDF parsing error:', pdfError);
       
-      // Use filename as fallback if text extraction fails
-      extractedText = req.file.originalname;
-      console.log('Using filename as fallback for analysis');
+      // Additional validation
+      if (extractedText.trim().length < 10) {
+        throw new AppError('PDF contains insufficient text for analysis', 400);
+      }
+      
+    } catch (pdfError) {
+      console.error('PDF extraction failed:', pdfError.message);
+      
+      // If it's our AppError, re-throw it
+      if (pdfError instanceof AppError) {
+        throw pdfError;
+      }
+      
+      // Otherwise, wrap it in an AppError
+      throw new AppError('Failed to extract text from PDF. The file may be corrupted or in an unsupported format.', 500);
     }
 
     let scanResults;
@@ -186,6 +234,12 @@ function performLocalScan(text, filename) {
   // Check all patterns
   for (const pattern of secretPatterns) {
     const matches = Array.from(text.matchAll(pattern.pattern) || []);
+    if (matches.length > 0) {
+      console.log(`Pattern matched: ${pattern.name}, count: ${matches.length}`);
+      matches.forEach((match, idx) => {
+        console.log(`  Match ${idx + 1}: ${match[0]}`);
+      });
+    }
     for (const match of matches) {
       findings.push({
         type: pattern.name,
