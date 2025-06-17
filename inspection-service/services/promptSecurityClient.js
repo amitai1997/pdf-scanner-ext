@@ -1,0 +1,199 @@
+/**
+ * Client for interacting with the Prompt Security API
+ */
+
+const { AppError } = require('../middleware/errorHandler');
+
+class PromptSecurityClient {
+  constructor() {
+    // Load API information from environment variables
+    this.apiUrl = 'https://eu.prompt.security/api/protect';
+    this.appId = process.env.PROMPT_SECURITY_APP_ID;
+
+    // Retry configuration
+    this.maxRetries = 3;
+    this.baseDelay = 1000; // 1 second
+    this.timeout = 30000; // 30 seconds
+    
+    if (!this.appId) {
+      console.warn('PROMPT_SECURITY_APP_ID not set in environment variables');
+    }
+  }
+
+  /**
+   * Send text to Prompt Security API for analysis
+   * @param {string} text - The text extracted from PDF to analyze
+   * @returns {Promise<object>} - API response with findings
+   */
+  async scanText(text) {
+    if (!text || typeof text !== 'string') {
+      throw new AppError('Invalid text provided for scanning', 400);
+    }
+
+    // Truncate text if too long (API might have limits)
+    const maxTextLength = 100000; // 100KB
+    const truncatedText = text.length > maxTextLength 
+      ? text.substring(0, maxTextLength) + '... [truncated]' 
+      : text;
+
+    console.log(`Sending ${truncatedText.length} characters to Prompt Security API`);
+
+    let attempt = 0;
+    let lastError = null;
+
+    // Retry logic
+    while (attempt < this.maxRetries) {
+      try {
+        attempt++;
+        console.log(`API attempt ${attempt} of ${this.maxRetries}`);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        const response = await fetch(this.apiUrl, {
+          method: 'POST',
+          headers: {
+            'APP-ID': this.appId,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ prompt: truncatedText }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        // Handle non-200 responses
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`API returned status ${response.status}: ${errorText}`);
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        // Parse and format response
+        const data = await response.json();
+        console.log('Raw API response:', JSON.stringify(data));
+        
+        // Map API response to our expected format
+        return this.mapApiResponse(data);
+      } catch (error) {
+        lastError = error;
+        console.error(`API attempt ${attempt} failed:`, error.message);
+
+        // Don't retry if it's a client error
+        if (error.message.includes('400') || error.message.includes('401') || 
+            error.message.includes('403')) {
+          break;
+        }
+
+        if (attempt < this.maxRetries) {
+          const delay = this.baseDelay * Math.pow(2, attempt - 1);
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    // If we get here, all attempts failed
+    console.error('API calls failed, falling back to local scanning');
+    return {
+      secrets: false,
+      findings: [],
+      action: 'allow',
+      scannedAt: new Date().toISOString(),
+      error: `API unavailable: ${lastError?.message}`
+    };
+  }
+
+  /**
+   * Map API response to our expected format
+   * @param {object} apiResponse - Raw API response
+   * @returns {object} - Formatted scan result
+   */
+  mapApiResponse(apiResponse) {
+    try {
+      // Check if the response has the expected structure
+      if (!apiResponse || !apiResponse.result) {
+        throw new Error('Invalid API response format');
+      }
+
+      const { result } = apiResponse;
+      const action = result.action || 'allow';
+      
+      // Extract findings from the prompt, safely checking for array
+      const findings = [];
+      
+      // Handle findings from the API (expect an object with different categories)
+      if (result.prompt && result.prompt.findings) {
+        const findingsObj = result.prompt.findings;
+        
+        // Secrets category
+        if (findingsObj.Secrets && Array.isArray(findingsObj.Secrets)) {
+          findingsObj.Secrets.forEach(secret => {
+            findings.push({
+              type: 'Secret',
+              category: secret.category || 'Unknown',
+              value: secret.entity || 'Unknown',
+              entity_type: secret.entity_type || 'Unknown',
+              severity: 'high'
+            });
+          });
+        }
+        
+        // URLs category
+        if (findingsObj['URLs Detector'] && Array.isArray(findingsObj['URLs Detector'])) {
+          findingsObj['URLs Detector'].forEach(url => {
+            findings.push({
+              type: 'URL',
+              value: url.entities || 'Unknown URL',
+              blocked: url.blocked || false,
+              severity: 'low'
+            });
+          });
+        }
+        
+        // Check other categories
+        Object.keys(findingsObj).forEach(category => {
+          if (category !== 'Secrets' && category !== 'URLs Detector') {
+            if (Array.isArray(findingsObj[category])) {
+              // Add a single summarized finding for other categories
+              const count = findingsObj[category].length;
+              if (count > 0) {
+                findings.push({
+                  type: category,
+                  value: `${count} detection(s)`,
+                  severity: 'info'
+                });
+              }
+            }
+          }
+        });
+      }
+
+      // Check for violations in result
+      if (result.violations && Array.isArray(result.violations) && result.violations.includes('Secrets')) {
+        console.log('Secret violations detected in result');
+      }
+
+      return {
+        secrets: findings.some(f => f.type === 'Secret'),
+        findings,
+        action,
+        scannedAt: new Date().toISOString(),
+        apiVersion: result.version || '1.0'
+      };
+    } catch (error) {
+      console.error('Error mapping API response:', error);
+      
+      // Return a safe default response
+      return {
+        secrets: false,
+        findings: [],
+        action: 'allow',
+        scannedAt: new Date().toISOString(),
+        error: 'Failed to parse API response'
+      };
+    }
+  }
+}
+
+module.exports = PromptSecurityClient; 
