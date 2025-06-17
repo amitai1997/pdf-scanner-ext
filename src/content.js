@@ -64,6 +64,12 @@ class PDFMonitor {
     // Debug mode
     this.debugMode = true;
     
+    // Event listener references for cleanup
+    this._inputChangeListeners = new Map();
+    this._formSubmitListeners = new Map();
+    this._buttonClickListeners = new Map();
+    this._currentEscHandler = null; // Store the current Escape key handler
+    
     logger.log('PDF Monitor initializing');
     this.init();
   }
@@ -1011,8 +1017,13 @@ class PDFMonitor {
     try {
       logger.log('Showing secret warning for file:', filename, result);
       
+      // Remove any existing warnings
+      this.removeExistingIndicators();
+      this.removeExistingSecurityWarnings();
+      
       // Create warning element
       const warningEl = document.createElement('div');
+      warningEl.id = 'pdf-scanner-security-warning';
       warningEl.style.cssText = `
         position: fixed;
         top: 0;
@@ -1208,11 +1219,16 @@ class PDFMonitor {
       // Add escape key handler to dismiss
       const escHandler = (e) => {
         if (e.key === 'Escape') {
-          warningEl.remove();
+          // Ensure all related warning elements are removed
+          this.removeExistingSecurityWarnings();
           document.removeEventListener('keydown', escHandler);
         }
       };
+      
+      // Remove any existing escape handlers first to avoid duplicates
+      document.removeEventListener('keydown', this._currentEscHandler);
       document.addEventListener('keydown', escHandler);
+      this._currentEscHandler = escHandler; // Store reference to current handler
       
       // No auto-remove for security warnings - user must take action
       
@@ -1574,6 +1590,28 @@ class PDFMonitor {
       }
     } catch (error) {
       logger.error('Error removing existing indicators:', error);
+    }
+  }
+  
+  /**
+   * Remove any existing security warning popups
+   */
+  removeExistingSecurityWarnings() {
+    try {
+      const existingWarning = document.getElementById('pdf-scanner-security-warning');
+      if (existingWarning) {
+        existingWarning.remove();
+      }
+      
+      // Also look for any elements that might be security warnings without IDs
+      const possibleWarnings = document.querySelectorAll('div[style*="z-index: 10000"]');
+      possibleWarnings.forEach(el => {
+        if (el.innerHTML.includes('Security Risk Detected')) {
+          el.remove();
+        }
+      });
+    } catch (error) {
+      logger.error('Error removing existing security warnings:', error);
     }
   }
 }
