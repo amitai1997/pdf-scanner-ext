@@ -72,6 +72,14 @@ class PDFScannerBackground {
     // Debug mode for additional logging
     this.debugMode = this.isDevelopment;
     
+    // Scan statistics
+    this.scanStats = {
+      scanCount: 0,
+      lastScan: null,
+      isActive: true,
+      scanHistory: []
+    };
+    
     // Log environment
     logger.log(`Running in ${this.isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
     logger.log(`Using backend URL: ${this.BACKEND_URL}`);
@@ -100,6 +108,12 @@ class PDFScannerBackground {
       logger.error('Interceptor not available');
     }
     
+    // Load scan stats from storage
+    this.loadScanStats();
+    
+    // Set up daily counter reset alarm
+    this.setupDailyCounterReset();
+    
     this.bindEvents();
     logger.log('PDF Scanner background initialized');
     
@@ -107,6 +121,82 @@ class PDFScannerBackground {
     this.registerAdditionalRequestListener();
   }
   
+  // Save scan statistics to chrome.storage
+  async saveScanStats() {
+    try {
+      await chrome.storage.local.set({ 
+        scanStats: {
+          scanCount: this.scanStats.scanCount,
+          lastScan: this.scanStats.lastScan,
+          date: new Date().toDateString()
+        } 
+      });
+      logger.log('Scan stats saved to storage', this.scanStats);
+    } catch (error) {
+      logger.error('Error saving scan stats to storage', error);
+    }
+  }
+  
+  // Load scan statistics from chrome.storage
+  async loadScanStats() {
+    try {
+      const data = await chrome.storage.local.get('scanStats');
+      if (data.scanStats) {
+        const today = new Date().toDateString();
+        
+        // If the stored date is today, use the stored count
+        // Otherwise, reset the count (it's a new day)
+        if (data.scanStats.date === today) {
+          this.scanStats.scanCount = data.scanStats.scanCount;
+          this.scanStats.lastScan = data.scanStats.lastScan;
+        } else {
+          this.scanStats.scanCount = 0;
+          this.scanStats.lastScan = null;
+          // Save the reset count
+          this.saveScanStats();
+        }
+        
+        logger.log('Scan stats loaded from storage', this.scanStats);
+      }
+    } catch (error) {
+      logger.error('Error loading scan stats from storage', error);
+    }
+  }
+  
+  // Setup daily counter reset
+  setupDailyCounterReset() {
+    try {
+      // Create an alarm to reset the counter at midnight
+      chrome.alarms.create('resetDailyCounter', {
+        // Fire at midnight
+        when: this.getNextMidnight(),
+        periodInMinutes: 24 * 60 // Once every 24 hours
+      });
+      
+      // Add listener for the alarm
+      chrome.alarms.onAlarm.addListener(alarm => {
+        if (alarm.name === 'resetDailyCounter') {
+          this.scanStats.scanCount = 0;
+          this.saveScanStats();
+          logger.log('Daily scan counter reset');
+        }
+      });
+      
+      logger.log('Daily counter reset alarm scheduled');
+    } catch (error) {
+      logger.error('Error setting up daily counter reset', error);
+    }
+  }
+  
+  // Get timestamp for next midnight
+  getNextMidnight() {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow.getTime();
+  }
+
   /**
    * Register an additional web request listener as backup
    * Note: In Manifest V3, this is non-blocking
@@ -176,121 +266,43 @@ class PDFScannerBackground {
   }
   
   /**
-   * Process a web request to check for PDF content
-   * @param {Object} details - Request details
+   * Register event listeners for the background script
    */
-  async processWebRequest(details) {
+  bindEvents() {
     try {
-      logger.log(`Processing request ${details.requestId} to ${details.url}`);
+      // Listen for messages from content scripts or popup
+      chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        this.handleMessage(message, sender, sendResponse);
+        // Return true to indicate we want to send a response asynchronously
+        return true;
+      });
       
-      // Check if request has raw data
-      if (!details.requestBody.raw || details.requestBody.raw.length === 0) {
-        return;
-      }
+      // Handle browser commands (keyboard shortcuts)
+      chrome.commands.onCommand.addListener((command) => {
+        this.handleCommand(command);
+      });
       
-      // Get the request body
-      const rawData = details.requestBody.raw[0].bytes;
+      // Handle extension installation/update
+      chrome.runtime.onInstalled.addListener((details) => {
+        this.handleInstalled(details);
+      });
       
-      // Convert to string for inspection
-      const decoder = new TextDecoder('utf-8');
-      let requestBody;
-      try {
-        requestBody = decoder.decode(rawData);
-      } catch (e) {
-        logger.error('Failed to decode request body:', e);
-        return;
-      }
-      
-      // Log request preview for debugging
-      if (this.debugMode) {
-        logger.log('Request body preview:', requestBody.substring(0, 100) + '...');
-      }
-      
-      // Check for PDF content
-      const isPDFRequest = this.checkForPDFContent(requestBody, details.url);
-      
-      if (isPDFRequest) {
-        logger.log('Detected potential PDF upload in request');
-        
-        // Extract PDF data if possible
-        try {
-          // This is a simplified version - in a real implementation,
-          // we would extract the PDF data from the request body
-          // and send it for scanning
-          
-          // For now, we'll just create a notification
-          this.showNotification({
-            title: 'PDF Upload Detected',
-            message: `Detected PDF upload to ${new URL(details.url).hostname}`
-          });
-        } catch (error) {
-          logger.error('Error extracting PDF from request:', error);
-        }
-      }
+      logger.log('Background event listeners registered');
     } catch (error) {
-      logger.error('Error processing web request:', error);
+      logger.error('Error binding event listeners:', error);
     }
   }
   
   /**
-   * Check if a request contains PDF content
-   * @param {string} requestBody - Request body as string
-   * @param {string} url - Request URL
-   * @returns {boolean} - Whether the request likely contains PDF content
+   * Handle messages sent from content scripts and popup
+   * @param {Object} message - Message object
+   * @param {Object} sender - Sender information 
+   * @param {Function} sendResponse - Function to send response
    */
-  checkForPDFContent(requestBody, url) {
-    try {
-      // Check for common PDF indicators in the request body
-      const pdfIndicators = [
-        'application/pdf',
-        'Content-Type: application/pdf',
-        '.pdf',
-        'filename=',
-        '%PDF-'
-      ];
-      
-      for (const indicator of pdfIndicators) {
-        if (requestBody.includes(indicator)) {
-          logger.log(`Found PDF indicator in request: ${indicator}`);
-          return true;
-        }
-      }
-      
-      // Check for base64 encoded content
-      if (requestBody.includes('base64')) {
-        logger.log('Found base64 content in request, might be PDF');
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      logger.error('Error checking for PDF content:', error);
-      return false;
-    }
-  }
-
-  bindEvents() {
-    // Listen for messages from popup and content scripts
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      this.handleMessage(message, sender, sendResponse);
-      return true; // Keep message channel open for async response
-    });
-
-    // Listen for keyboard shortcuts
-    chrome.commands.onCommand.addListener((command) => {
-      this.handleCommand(command);
-    });
-
-    // Handle extension installation
-    chrome.runtime.onInstalled.addListener((details) => {
-      this.handleInstalled(details);
-    });
-  }
-
   async handleMessage(message, sender, sendResponse) {
-    logger.log('Background received message:', message.type);
-
     try {
+      logger.log('Background received message:', message.type);
+      
       switch (message.type) {
         case 'ping': {
           // Simple ping to check if extension is responsive
@@ -313,61 +325,65 @@ class PDFScannerBackground {
           break;
         }
         
-        case 'intercepted_pdf': {
-          // Handle PDF intercepted by webRequest
-          const result = await this.handleInterceptedPDF(message);
-          sendResponse({ success: true, result });
-          
-          // If this came from a content script, notify it of the result
-          if (sender.tab && sender.tab.id) {
-            chrome.tabs.sendMessage(sender.tab.id, {
-              type: 'scan_result',
-              requestId: message.requestId,
-              filename: message.filename,
-              result: result
-            }).catch(err => {
-              logger.error('Error sending scan result to content script', err);
-            });
-          }
-          break;
-        }
-        
         case 'content_loaded': {
-          // Content script has loaded on a page
-          logger.log('Content script loaded on:', message.url);
+          // Content script has loaded in a tab
+          logger.log('Content script loaded in tab:', sender.tab ? sender.tab.id : 'unknown');
           sendResponse({ success: true });
           break;
         }
         
         case 'pdf_selected': {
-          // Content script detected PDF selection
-          logger.log('PDF selected in content script:', message.filename);
+          // PDF file was selected by user
+          logger.log('PDF selected in tab:', sender.tab ? sender.tab.id : 'unknown');
           sendResponse({ success: true });
           break;
         }
         
-        case 'pdf_detected_in_ui': {
-          // Content script detected PDF in UI
-          logger.log('PDF detected in UI:', message.details);
+        case 'intercepted_pdf': {
+          // PDF was intercepted (form upload, XHR, etc.)
+          logger.log('PDF intercepted:', message.filename);
+          this.handleInterceptedPDF(message).catch(err => {
+            logger.error('Error handling intercepted PDF:', err);
+          });
           sendResponse({ success: true });
           break;
         }
-
-        case 'showNotification':
-          await this.showNotification(message);
-          sendResponse({ success: true });
+        
+        case 'GET_SCAN_STATS': {
+          // Popup is requesting scan statistics
+          logger.log('Popup requested scan statistics');
+          sendResponse({ 
+            success: true, 
+            scanCount: this.scanStats.scanCount,
+            lastScan: this.scanStats.lastScan,
+            isActive: this.scanStats.isActive
+          });
           break;
-
+        }
+        
+        case 'TOGGLE_ACTIVE_STATE': {
+          // Toggle the active state
+          this.scanStats.isActive = !this.scanStats.isActive;
+          logger.log(`Scanner ${this.scanStats.isActive ? 'activated' : 'deactivated'}`);
+          sendResponse({ 
+            success: true, 
+            isActive: this.scanStats.isActive 
+          });
+          break;
+        }
+        
         default:
-          logger.warn('Unknown message type:', message.type);
+          // Unhandled message type
+          logger.warn('Unhandled message type:', message.type);
           sendResponse({ success: false, error: 'Unknown message type' });
+          break;
       }
     } catch (error) {
       logger.error('Error handling message:', error);
       sendResponse({ success: false, error: error.message });
     }
   }
-
+  
   async handleCommand(command) {
     logger.log('Command received:', command);
 
@@ -731,29 +747,33 @@ class PDFScannerBackground {
   }
   
   async logScanResult(fileName, result) {
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      fileName: fileName,
-      secrets: result.secrets,
-      findingsCount: result.findings?.length || 0,
-      action: result.action,
-    };
-
-    logger.log('Scan result logged:', logEntry);
-
-    // Store in local storage for debugging (will be sent to backend later)
     try {
-      const { scanHistory = [] } = await chrome.storage.local.get('scanHistory');
-      scanHistory.push(logEntry);
-
-      // Keep only last 50 entries
-      if (scanHistory.length > 50) {
-        scanHistory.splice(0, scanHistory.length - 50);
+      // Update scan count and save to storage
+      this.scanStats.scanCount++;
+      this.scanStats.lastScan = new Date().toISOString();
+      
+      // Save scan stats to storage
+      this.saveScanStats();
+      
+      // Existing scan history logic
+      this.scanStats.scanHistory.push({
+        timestamp: Date.now(),
+        fileName,
+        result: result
+      });
+      
+      // Only keep the last 50 scan results in memory
+      if (this.scanStats.scanHistory.length > 50) {
+        this.scanStats.scanHistory.shift();
       }
-
-      await chrome.storage.local.set({ scanHistory });
+      
+      logger.log('Scan stats updated:', {
+        scanCount: this.scanStats.scanCount,
+        lastScan: this.scanStats.lastScan
+      });
+  
     } catch (error) {
-      logger.error('Failed to log scan result:', error);
+      logger.error('Error logging scan result:', error);
     }
   }
   
