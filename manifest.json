@@ -62,6 +62,10 @@
         "https://*.claude.ai/*",
         "https://*.anthropic.com/*"
       ]
+    },
+    {
+      "resources": ["icons/icon.png"],
+      "matches": ["<all_urls>"]
     }
   ],
 
