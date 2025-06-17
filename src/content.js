@@ -1141,7 +1141,17 @@ class PDFMonitor {
       
       // Add findings
       if (result.findings && result.findings.length > 0) {
-        result.findings.forEach(finding => {
+        // Filter out generic non-informative findings that just show counts
+        const meaningfulFindings = result.findings.filter(finding => {
+          // Skip findings that are just showing detection counts
+          const isGenericCount = finding.value && finding.value.includes('detection(s)') && 
+                               (finding.type === 'Language Detector' || 
+                                finding.type === 'Sensitive Data' || 
+                                finding.type === 'Token Limitation');
+          return !isGenericCount;
+        });
+        
+        meaningfulFindings.forEach(finding => {
           const findingEl = document.createElement('li');
           
           // Create more detailed finding information
@@ -1149,16 +1159,14 @@ class PDFMonitor {
             findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}` + 
               (finding.entity_type ? ` <em>(${finding.entity_type})</em>` : '') +
               (finding.category ? ` <em>${finding.category}</em>` : '');
-          } else if (finding.value) {
-            // Show the actual value if available
+          } else if (finding.type === 'URL') {
+            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
+          } else if (finding.value && !finding.value.includes('detection(s)')) {
+            // Show the actual value if available and not just a count
             findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
           } else {
-            findingEl.innerHTML = `<strong>${finding.type}</strong>`;
-            
-            // Add severity if available
-            if (finding.severity) {
-              findingEl.innerHTML += ` <em>(${finding.severity})</em>`;
-            }
+            // Skip non-informative findings
+            return;
           }
           
           findingEl.style.cssText = `
@@ -1168,12 +1176,18 @@ class PDFMonitor {
           
           findingsListEl.appendChild(findingEl);
         });
+        
+        // If all findings were filtered out, add a generic message
+        if (findingsListEl.children.length === 0) {
+          const findingEl = document.createElement('li');
+          findingEl.textContent = 'Potential sensitive information detected';
+          findingEl.style.cssText = `color: #333;`;
+          findingsListEl.appendChild(findingEl);
+        }
       } else {
         const findingEl = document.createElement('li');
         findingEl.textContent = 'Potential sensitive information detected';
-        findingEl.style.cssText = `
-          color: #333;
-        `;
+        findingEl.style.cssText = `color: #333;`;
         findingsListEl.appendChild(findingEl);
       }
       
