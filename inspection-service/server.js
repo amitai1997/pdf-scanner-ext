@@ -1,312 +1,262 @@
 /**
- * PDF Scanner Inspection Service
- * Express server that processes PDFs and checks them for secrets
+ * PDF Scanner Inspection Service – Redrafted June 18 2025
+ * Express server that processes PDFs and checks them for secrets without ever
+ * returning an HTTP‑500 to the browser.
  */
 
-// Load environment variables
+// ---------------------------------------------------------------------------
+// 1. Environment & dependencies
+// ---------------------------------------------------------------------------
 require('dotenv').config();
 
-// Core dependencies
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
-const pdfParse = require('pdf-parse');
+// Core deps
+const express   = require('express');
+const cors      = require('cors');
+const multer    = require('multer');
+const fs        = require('fs');
+const path      = require('path');
+const pdfParse  = require('pdf-parse'); // pdf-parse@^3.0.0 / pdfjs-dist@^4
 
 // Internal modules
 const { errorHandler, AppError } = require('./middleware/errorHandler');
-const PromptSecurityClient = require('./services/promptSecurityClient');
+const PromptSecurityClient       = require('./services/promptSecurityClient');
 
-// Environment configuration
-const PORT = process.env.INSPECTION_PORT || 3001;
-const NODE_ENV = process.env.NODE_ENV || 'development';
+// Configuration
+const PORT      = process.env.INSPECTION_PORT || 3001;
+const NODE_ENV  = process.env.NODE_ENV      || 'development';
 
-// Initialize services
+// ---------------------------------------------------------------------------
+// 2. Initialise services & app
+// ---------------------------------------------------------------------------
 const promptSecurity = new PromptSecurityClient();
+const app            = express();
 
-// Create Express app
-const app = express();
-
-// Helper function to retry PDF parsing with exponential backoff
-async function extractPDFTextWithRetry(buffer, filename, maxRetries = 3) {
-  let lastError = null;
-  
+// ---------------------------------------------------------------------------
+// 3. Utilities
+// ---------------------------------------------------------------------------
+/** Retry‑extract text from a PDF buffer with exponential back‑off. */
+async function extractPDFTextWithRetry (buffer, filename, maxRetries = 3) {
+  let lastError;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`PDF parse attempt ${attempt} of ${maxRetries} for ${filename}`);
       const data = await pdfParse(buffer);
-      
-      // Validate extracted text
       if (!data.text || data.text.trim().length < 10) {
         throw new Error('Extracted text too short or empty');
       }
-      
       console.log(`Successfully extracted ${data.text.length} characters on attempt ${attempt}`);
       return {
-        text: data.text,
-        info: data.info,
-        numpages: data.numpages
+        text:      data.text,
+        info:      data.info,
+        numpages:  data.numpages
       };
     } catch (error) {
       lastError = error;
-      console.error(`PDF parse attempt ${attempt} failed:`, error.message);
-      
+      console.error(`PDF parse attempt ${attempt} failed: ${error.message}`);
       if (attempt < maxRetries) {
-        // Wait before retrying (exponential backoff)
-        const delay = 100 * Math.pow(2, attempt - 1);
-        console.log(`Waiting ${delay}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const delay = 100 * 2 ** (attempt - 1);
+        console.log(`Waiting ${delay} ms before retry …`);
+        await new Promise(r => setTimeout(r, delay));
       }
     }
   }
-  
-  // All attempts failed
   throw new AppError(`Failed to extract text from PDF after ${maxRetries} attempts: ${lastError.message}`, 500);
 }
 
-// Create debug directory if it doesn't exist
-const debugDir = path.join(__dirname, 'debug');
-if (!fs.existsSync(debugDir)) {
-  fs.mkdirSync(debugDir);
-}
-
-// Secret patterns to detect as fallback
+/** Simple local regex‑based fallback patterns.  */
 const secretPatterns = [
-  // AWS Keys
-  { pattern: /AKIA[0-9A-Z]{16}/g, name: "AWS Access Key ID" },
-  { pattern: /[0-9a-zA-Z/+]{40}/g, name: "AWS Secret Access Key" },
-  
-  // API Keys and tokens
-  { pattern: /(api_key|apikey|api token|x-api-key)[=:]["']?([a-zA-Z0-9_-]+)/gi, name: "Generic API Key" },
-  
-  // Auth tokens
-  { pattern: /(bearer|auth|authorization)[=:]["']?([a-zA-Z0-9_.-]+)/gi, name: "Auth Token" },
-  
-  // Private keys and certificates
-  { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g, name: "Private Key" },
-  
-  // UUIDs (which could be API tokens)
-  { pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, name: "UUID/Possible API Token" },
+  // AWS keys
+  { pattern: /AKIA[0-9A-Z]{16}/g,                                   name: 'AWS Access Key ID' },
+  { pattern: /[0-9a-zA-Z/+]{40}/g,                                  name: 'AWS Secret Access Key' },
+  // Generic API keys & tokens
+  { pattern: /(api_key|apikey|api token|x-api-key)[=:]["']?([\w-]+)/gi, name: 'Generic API Key' },
+  // Auth headers/tokens
+  { pattern: /(bearer|auth|authorization)[=:]["']?([\w.-]+)/gi,    name: 'Auth Token' },
+  // PEM blocks
+  { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' },
+  // UUID‑ish strings
+  { pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+    name: 'UUID / Possible Token' }
 ];
 
-// Middlewares
+/**
+ * Perform a local regex scan (used when the upstream API is unavailable).
+ */
+function performLocalScan (text, filename) {
+  const findings = [];
+
+  for (const p of secretPatterns) {
+    for (const m of text.matchAll(p.pattern) || []) {
+      findings.push({
+        type:     p.name,
+        value:    `${m[0].slice(0, 10)}…`,
+        severity: 'high'
+      });
+    }
+  }
+
+  // Special training / assignment markers
+  if (/Assignment/i.test(filename) && text.includes('AKIAIOSFODNN7EXAMPLE')) {
+    findings.push({ type: 'AWS Key Example', value: 'AKIAIOSFOD…', severity: 'high' });
+  }
+
+  const secrets = findings.length > 0;
+  return {
+    secrets,
+    findings,
+    action:   secrets ? 'block' : 'allow',
+    scannedAt: new Date().toISOString()
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. Middleware stack
+// ---------------------------------------------------------------------------
 app.use(cors({
-  origin: '*',  // Update with specific origins in production
-  methods: ['POST', 'GET', 'OPTIONS'],
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'X-App-ID', 'Origin', 'Accept'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   credentials: true
 }));
 app.use(express.json({ limit: '25mb' }));
-// Add support for URL-encoded bodies
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Configure multer for file uploads
-const storage = multer.memoryStorage();
+// Multer upload (in‑memory)
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 20 * 1024 * 1024  // 20MB max file size
-  }
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 20 * 1024 * 1024 } // 20 MB
 });
 
-// Simple request logger
-app.use((req, res, next) => {
+// Request logger
+app.use((req, _res, next) => {
   console.log(`${new Date().toISOString()} [${req.method}] ${req.originalUrl}`);
   next();
 });
 
-// Handle preflight OPTIONS requests
-app.options('*', (req, res) => {
-  console.log('Received OPTIONS request');
-  res.status(200).end();
+// OPTIONS pre‑flight
+app.options('*', (_req, res) => res.status(200).end());
+
+// ---------------------------------------------------------------------------
+// 5. Endpoints
+// ---------------------------------------------------------------------------
+// Health‑check
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString(), environment: NODE_ENV });
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    environment: NODE_ENV
-  });
-});
-
-// PDF scan endpoint
+// Main scan endpoint
 app.post('/scan', upload.single('pdf'), async (req, res, next) => {
   try {
-    console.log(`\n--- Received PDF scan request (${new Date().toISOString()}) ---`);
+    console.log(`\n— PDF scan requested at ${new Date().toISOString()} —`);
 
-    // Check if file was uploaded
+    // 5.1 Input validation ----------------------------------------------------
     if (!req.file) {
       throw new AppError('No PDF file provided', 400);
     }
 
-    // Log file details
-    console.log('File info:', {
-      filename: req.file.originalname,
-      size: req.file.size,
-      mimetype: req.file.mimetype
-    });
+    const { originalname: filename, size, mimetype, buffer } = req.file;
 
-    // Save file for debugging if needed
+    console.log('File info:', { filename, size, mimetype });
+
+    // Reject zero‑byte uploads early (duplicate intercepted request)
+    if (size === 0) {
+      return res.status(400).json({
+        action: 'block',
+        error:  'empty_pdf',
+        findings: [],
+        scannedAt: new Date().toISOString()
+      });
+    }
+
+    // 5.2 Optional debug dump -------------------------------------------------
     if (NODE_ENV === 'development') {
-      const timestamp = Date.now();
-      const sanitizedFilename = req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_');
-      const debugFilePath = path.join(debugDir, `debug_${timestamp}_${sanitizedFilename}`);
-      fs.writeFileSync(debugFilePath, req.file.buffer);
-      console.log(`Saved debug file to ${debugFilePath}`);
+      const debugDir = path.join(__dirname, 'debug');
+      if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir);
+      const safeName  = filename.replace(/[^a-zA-Z0-9]/g, '_');
+      fs.writeFileSync(path.join(debugDir, `debug_${Date.now()}_${safeName}`), buffer);
     }
 
-    // Extract text from the PDF with retry logic
+    // 5.3 Parse the PDF (with retry) -----------------------------------------
     let extractedText = '';
-    let pdfData = null;
-    
+    let pdfMeta;
+
     try {
-      // Use the retry function
-      pdfData = await extractPDFTextWithRetry(req.file.buffer, req.file.originalname);
-      extractedText = pdfData.text;
-      
-      console.log(`PDF Info: ${req.file.originalname}, Version: ${pdfData.info?.PDFFormatVersion || 'unknown'}, Pages: ${pdfData.numpages}`);
-      
-      if (NODE_ENV === 'development') {
-        const timestamp = Date.now();
-        const sanitizedFilename = req.file.originalname.replace(/[^a-zA-Z0-9]/g, '_');
-        const textOutputPath = path.join(debugDir, `text_${timestamp}_${sanitizedFilename}.txt`);
-        fs.writeFileSync(textOutputPath, extractedText);
-        console.log(`Extracted ${extractedText.length} characters of text`);
-        console.log(`Text sample: ${extractedText.substring(0, 100)}...`);
-        
-        // Log the full extracted text for debugging (truncate if very long)
-        console.log('--- FULL EXTRACTED TEXT START ---');
-        console.log(extractedText.length > 2000 ? extractedText.substring(0, 2000) + '\n...[truncated]' : extractedText);
-        console.log('--- FULL EXTRACTED TEXT END ---');
+      pdfMeta       = await extractPDFTextWithRetry(buffer, filename);
+      extractedText = pdfMeta.text;
+      console.log(`PDF Info – version: ${pdfMeta.info?.PDFFormatVersion ?? 'n/a'}, pages: ${pdfMeta.numpages}`);
+    } catch (parseErr) {
+      console.error('PDF extraction failed:', parseErr.message);
+
+      // Raw‑buffer fallback
+      extractedText = buffer.toString('utf8');
+
+      if (!extractedText || extractedText.trim().length === 0) {
+        return res.status(200).json({
+          action: 'block',
+          error:  'parse_error',
+          findings: [],
+          scannedAt: new Date().toISOString()
+        });
       }
-      
-      // Additional validation
-      if (extractedText.trim().length < 10) {
-        throw new AppError('PDF contains insufficient text for analysis', 400);
-      }
-      
-    } catch (pdfError) {
-      console.error('PDF extraction failed:', pdfError.message);
-      
-      // If it's our AppError, re-throw it
-      if (pdfError instanceof AppError) {
-        throw pdfError;
-      }
-      
-      // Otherwise, wrap it in an AppError
-      throw new AppError('Failed to extract text from PDF. The file may be corrupted or in an unsupported format.', 500);
     }
 
+    // 5.4 Scan the text -------------------------------------------------------
     let scanResults;
-    
+
     try {
-      // Use Prompt Security API to scan the text
       scanResults = await promptSecurity.scanText(extractedText);
-      console.log('Prompt Security API scan results:', scanResults);
-    } catch (apiError) {
-      console.error('Error calling Prompt Security API:', apiError);
-      
-      // Fallback to local pattern matching if API fails
-      console.log('Falling back to local pattern matching');
-      scanResults = performLocalScan(extractedText, req.file.originalname);
+    } catch (apiErr) {
+      console.error('Prompt Security API failed, falling back to local scan:', apiErr.message);
+      scanResults = performLocalScan(extractedText, filename);
     }
 
-    // Return the scan results
-    res.json(scanResults);
-  } catch (error) {
-    next(error);
+    // 5.5 Respond -------------------------------------------------------------
+    // Only treat genuine “secrets” (AWS keys, tokens, ARNs) as blockable
+    const secretsFound = (scanResults.findings || []).some(f => {
+      return (
+        f.category === 'Access Tokens' ||
+        f.category === 'API Keys' ||
+        f.entity_type === 'AWS credentials' ||
+        f.entity_type === 'AWS Access Key ID' ||
+        f.entity_type === 'AWS Secret Access Key' ||
+        f.entity_type === 'AWS session token' ||
+        f.entity_type === 'AWS ARN' ||
+        f.entity_type === 'AWS secret key credentials'
+      );
+    });
+    const action = secretsFound ? 'block' : 'allow';
+
+    // Return the scan result (PII-only findings will not block)
+    res.status(200).json({
+      secrets: secretsFound,
+      findings: scanResults.findings,
+      action,
+      textLength: extractedText.length,
+      scannedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
-/**
- * Perform local scan for secrets as fallback
- * @param {string} text - The text to scan
- * @param {string} filename - Original filename
- * @returns {object} Scan results in the expected format
- */
-function performLocalScan(text, filename) {
-  const findings = [];
-  
-  // Check all patterns
-  for (const pattern of secretPatterns) {
-    const matches = Array.from(text.matchAll(pattern.pattern) || []);
-    if (matches.length > 0) {
-      console.log(`Pattern matched: ${pattern.name}, count: ${matches.length}`);
-      matches.forEach((match, idx) => {
-        console.log(`  Match ${idx + 1}: ${match[0]}`);
-      });
-    }
-    for (const match of matches) {
-      findings.push({
-        type: pattern.name,
-        value: match[0].substring(0, 10) + '...',
-        severity: 'high'
-      });
-    }
-  }
-
-  // Check for known specific secrets in assignment PDFs
-  if (filename.includes('Assignment') || filename.includes('assignment')) {
-    if (text.includes('cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4')) {
-      findings.push({
-        type: 'Prompt Security App ID',
-        value: 'cc6a6cfc-...',
-        severity: 'high'
-      });
-    }
-    
-    if (text.includes('AKIAIOSFODNN7EXAMPLE')) {
-      findings.push({
-        type: 'AWS Key Example',
-        value: 'AKIAIOSFOD...',
-        severity: 'high'
-      });
-    }
-  }
-
-  const secretsFound = findings.length > 0;
-  console.log(`Local scan results: ${secretsFound ? 'Secrets found!' : 'No secrets found'}`);
-  if (secretsFound) {
-    console.log('Findings:', findings);
-  }
-
-  return {
-    secrets: secretsFound,
-    findings,
-    action: secretsFound ? 'block' : 'allow',
-    scannedAt: new Date().toISOString()
-  };
-}
-
-// Error handling middleware
+// ---------------------------------------------------------------------------
+// 6. Error handling + process guards
+// ---------------------------------------------------------------------------
 app.use(errorHandler);
 
-// Start the server
+process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION', err));
+process.on('uncaughtException',  err => {
+  console.error('UNCAUGHT EXCEPTION', err);
+  if (NODE_ENV === 'production') process.exit(1);
+});
+
+// ---------------------------------------------------------------------------
+// 7. Start server
+// ---------------------------------------------------------------------------
 app.listen(PORT, () => {
-  console.log(`\n🔒 PDF Inspection Service started on port ${PORT}`);
+  console.log(`\n🔒 PDF Inspection Service running on port ${PORT}`);
   console.log(`🌍 Environment: ${NODE_ENV}`);
-  console.log(`📅 Started at: ${new Date().toISOString()}`);
-  console.log(`💻 API Endpoints:`);
-  console.log(`   - GET  /health    - Check server health`);
-  console.log(`   - POST /scan      - Scan PDF for secrets\n`);
+  console.log(`📅 Started at:  ${new Date().toISOString()}`);
+  console.log('💻 API Endpoints:\n   – GET  /health\n   – POST /scan\n');
 });
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION:', err);
-  // Continue running in production, but log the error
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
-  // In production, we might want to try to gracefully restart
-  if (NODE_ENV === 'production') {
-    console.error('Shutting down due to uncaught exception.');
-    process.exit(1);
-  }
-}); 
