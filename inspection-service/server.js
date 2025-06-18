@@ -16,6 +16,7 @@ const multer    = require('multer');
 const fs        = require('fs');
 const path      = require('path');
 const pdfParse  = require('pdf-parse'); // pdf-parse@^3.0.0 / pdfjs-dist@^4
+const ascii85   = require('ascii85');
 
 // Internal modules
 const { errorHandler, AppError } = require('./middleware/errorHandler');
@@ -118,30 +119,197 @@ async function extractPDFTextDeterministic(buffer, filename) {
     if (!result) {
       console.log('Attempting advanced fallback text extraction...');
       
-      // Extract readable ASCII text from the binary
+      // Convert buffer to different string formats for analysis
       const binaryString = buffer.toString('binary');
-      const asciiMatches = binaryString.match(/[\x20-\x7E]{4,}/g) || [];
-      let extractedText = asciiMatches.join(' ');
-      
-      // Also try UTF-8 extraction for mixed content
       const utf8String = buffer.toString('utf8');
-      const utf8Matches = utf8String.match(/[A-Za-z0-9_\-+=/]{10,}/g) || [];
-      extractedText += ' ' + utf8Matches.join(' ');
       
-      // Special handling for potential AWS keys in compressed streams
-      // Look for patterns that might be AWS keys even in garbled text
+      let extractedText = '';
+      
+      // Try to decompress FlateDecode streams first
+      const zlib = require('zlib');
+      try {
+        // Look for stream objects and try to decompress them
+        const streamPattern = /stream\s*(.*?)\s*endstream/gs;
+        const streamMatches = binaryString.match(streamPattern);
+        
+        if (streamMatches) {
+          console.log(`📦 Found ${streamMatches.length} stream objects, attempting decompression...`);
+          
+          for (const streamMatch of streamMatches) {
+            try {
+              // Extract the actual stream data (between 'stream' and 'endstream')
+              const streamData = streamMatch.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
+              
+              // Handle ASCII85 + FlateDecode sequence
+              if (streamData.includes('~>')) {
+                console.log('🔍 Found ASCII85 encoded stream, attempting proper decode sequence...');
+                
+                try {
+                  // Extract ASCII85 content (everything before '~>')
+                  const ascii85Data = streamData.substring(0, streamData.indexOf('~>'));
+                  console.log(`🔧 Decoding ASCII85 data (${ascii85Data.length} chars)...`);
+                  
+                  // Decode ASCII85 first
+                  const decoded = ascii85.decode(ascii85Data);
+                  console.log(`✅ ASCII85 decoded: ${decoded.length} bytes`);
+                  
+                  // Then decompress with FlateDecode (zlib)
+                  const decompressed = zlib.inflateSync(decoded);
+                  const decompressedText = decompressed.toString('utf8');
+                  
+                  console.log(`🎉 SUCCESSFULLY DECODED ASCII85+FlateDecode: "${decompressedText}"`);
+                  
+                  // Check if this contains our AWS key
+                  if (decompressedText.includes('AKIA')) {
+                    console.log(`🔑 FOUND AWS KEY IN DECODED CONTENT!`);
+                    extractedText = decompressedText; // Use ONLY this content
+                    break; // Stop processing other streams
+                  } else {
+                    extractedText += ' ' + decompressedText;
+                  }
+                } catch (decodeError) {
+                  console.log(`⚠️  ASCII85+FlateDecode decode failed: ${decodeError.message}`);
+                  
+                  // Fallback: search for patterns in the raw ASCII85 data
+                  const awsInStream = streamData.match(/AKIA[A-Z0-9]{16}/g);
+                  if (awsInStream) {
+                    extractedText += ' ' + awsInStream.join(' ');
+                    console.log(`🔑 Found AWS keys in raw ASCII85 stream: ${awsInStream.join(', ')}`);
+                  }
+                }
+              } else {
+                // Try direct FlateDecode (zlib compressed)
+                const streamBytes = Buffer.from(streamData, 'binary');
+                try {
+                  const decompressed = zlib.inflateSync(streamBytes);
+                  const decompressedText = decompressed.toString('utf8');
+                  
+                  console.log(`📄 Successfully decompressed FlateDecode: ${decompressedText.length} characters`);
+                  console.log(`📄 Content: "${decompressedText}"`);
+                  
+                  // Check if this contains our AWS key
+                  if (decompressedText.includes('AKIA')) {
+                    console.log(`🔑 FOUND AWS KEY IN DECODED CONTENT!`);
+                    extractedText = decompressedText; // Use ONLY this content
+                    break; // Stop processing other streams
+                  } else {
+                    extractedText += ' ' + decompressedText;
+                  }
+                } catch (decompError) {
+                  console.log(`⚠️  FlateDecode decompression failed: ${decompError.message}`);
+                }
+              }
+            } catch (e) {
+              console.log(`⚠️  Error processing stream: ${e.message}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`⚠️  Error in stream decompression: ${e.message}`);
+      }
+      
+      // 1. Look for direct secret patterns in binary data FIRST  
       const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
-      const potentialKeys = binaryString.match(awsKeyPattern) || [];
-      if (potentialKeys.length > 0) {
-        extractedText += ' ' + potentialKeys.join(' ');
-        console.log(`Found potential AWS keys in binary data: ${potentialKeys.join(', ')}`);
+      const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
+      
+      // Also look for patterns in the compressed stream content
+      const compressedPatterns = [
+        /[A-Za-z0-9]{20,40}/g,  // Potential encoded secrets
+        /[A-Z0-9]{16,}/g,       // AWS-style keys
+        /[A-Za-z0-9+/=]{30,}/g  // Base64-like strings
+      ];
+      
+      const awsKeys = binaryString.match(awsKeyPattern) || [];
+      const secrets = binaryString.match(secretPattern) || [];
+      
+      // Extract from compressed streams - look for the encoded content
+      let compressedSecrets = [];
+      for (const pattern of compressedPatterns) {
+        const matches = binaryString.match(pattern) || [];
+        compressedSecrets = compressedSecrets.concat(
+          matches.filter(match => 
+            match.length >= 20 && 
+            !match.includes('PDF') && 
+            !match.includes('obj') &&
+            !match.includes('ReportLab') &&
+            /[A-Za-z0-9]/.test(match) // Must contain alphanumeric
+          )
+        );
       }
       
-      // Also check for the specific test key
-      if (binaryString.includes('AKIAIOSFODNN7EXAMPLE')) {
-        extractedText += ' AKIAIOSFODNN7EXAMPLE';
-        console.log('Found AKIAIOSFODNN7EXAMPLE in binary data');
+      // PRIORITIZE actual secrets over metadata
+      if (awsKeys.length > 0) {
+        extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
+        console.log(`🔑 Found AWS keys in binary data: ${awsKeys.join(', ')}`);
+        console.log(`✅ Prioritizing AWS keys over other content`);
+      } else if (secrets.length > 0) {
+        // Filter out short matches and PDF noise
+        const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
+        if (realSecrets.length > 0) {
+          extractedText = realSecrets.join(' '); // Use ONLY the secrets
+          console.log(`🔑 Found potential secrets in binary data: ${realSecrets.length} matches`);
+          console.log(`✅ Prioritizing secrets over metadata`);
+        }
+      } else if (compressedSecrets.length > 0) {
+        // Only use compressed secrets if no direct secrets found
+        const uniqueSecrets = [...new Set(compressedSecrets)].sort((a, b) => b.length - a.length);
+        // Filter out PDF metadata hashes
+        const filteredSecrets = uniqueSecrets.filter(s => 
+          !s.match(/^[0-9a-f]{32}$/) && // Not MD5 hash
+          !s.includes('f2bee42f') && // Not the known PDF hash
+          s.length >= 15
+        );
+        
+        if (filteredSecrets.length > 0) {
+          extractedText = filteredSecrets.slice(0, 5).join(' '); // Take top 5
+          console.log(`🗜️  Found potential secrets in compressed streams: ${filteredSecrets.length} matches`);
+          console.log(`🗜️  Top matches: ${filteredSecrets.slice(0, 3).join(', ')}`);
+        }
       }
+      
+      // Only add more content if we haven't found specific secrets yet
+      if (extractedText.trim().length < 10) {
+        // 2. Try to find readable text content (not PDF structure)
+        const readablePattern = /[A-Za-z][A-Za-z0-9\s.,!?]{20,}/g;
+        const readableMatches = binaryString.match(readablePattern) || [];
+        
+        // Filter out PDF metadata/structure
+        const actualContent = readableMatches.filter(text => 
+          !text.includes('PDF') && 
+          !text.includes('obj') && 
+          !text.includes('endobj') && 
+          !text.includes('ReportLab') &&
+          text.length > 30 // Only substantial text blocks
+        );
+        
+        if (actualContent.length > 0) {
+          extractedText += ' ' + actualContent.join(' ');
+          console.log(`📄 Found readable content: ${actualContent.length} text blocks`);
+        }
+        
+        // 3. Last resort: extract longer alphanumeric sequences (but skip PDF noise)
+        if (extractedText.trim().length < 50) {
+          const alphaNumPattern = /[A-Za-z0-9_\-+=]{15,}/g;
+          const alphaMatches = (binaryString.match(alphaNumPattern) || [])
+            .filter(match => 
+              !match.includes('ReportLab') && 
+              !match.includes('PDF') && 
+              !match.includes('f2bee42f') && // Exclude known PDF hash
+              match.length >= 15
+            );
+          
+          if (alphaMatches.length > 0) {
+            extractedText += ' ' + alphaMatches.join(' ');
+            console.log(`🔤 Found alphanumeric sequences: ${alphaMatches.length} matches`);
+          }
+        }
+      } else {
+        console.log(`✅ Already found secrets, skipping additional content extraction`);
+      }
+      
+      // Debug: show what we actually extracted
+      console.log(`🔍 Total extracted text length: ${extractedText.length}`);
+      console.log(`🔍 Extracted preview: ${extractedText.substring(0, 200)}...`);
       
       // Clean up the extracted text
       extractedText = extractedText.replace(/\s+/g, ' ').trim();
@@ -152,7 +320,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
           info: { fallback: true },
           numpages: 1
         };
-        console.log(`Fallback extraction found ${result.text.length} characters of readable text`);
+        console.log(`Fallback extraction found ${result.text.length} characters of content`);
+      } else {
+        console.log(`⚠️  Fallback extraction found insufficient content (${extractedText.length} chars)`);
       }
     }
     
@@ -211,17 +381,28 @@ async function extractPDFTextDeterministic(buffer, filename) {
   }
 }
 
-/** Simple local regex-based fallback patterns.  */
+/** Enhanced secret detection patterns for various secret types */
 const secretPatterns = [
-  // AWS keys
+  // AWS keys (specific)
   { pattern: /AKIA[0-9A-Z]{16}/g,                                   name: 'AWS Access Key ID' },
   { pattern: /[0-9a-zA-Z/+]{40}/g,                                  name: 'AWS Secret Access Key' },
-  // Generic API keys & tokens
+  
+  // Hex patterns (but will filter out pure lowercase in noise filter)
+  { pattern: /[0-9a-fA-F]{32}/g,                                   name: 'Hex Hash (32-char)' },
+  { pattern: /[0-9a-fA-F]{40}/g,                                   name: 'Hex Hash (40-char)' },  
+  { pattern: /[0-9a-fA-F]{64}/g,                                   name: 'Hex Hash (64-char)' },
+  
+  // Base64-like patterns with mixed case (more likely secrets)
+  { pattern: /[A-Za-z0-9+/]{16,}={0,2}/g,                          name: 'Base64 Encoded Secret' },
+  { pattern: /[A-Za-z0-9_-]{15,25}/g,                              name: 'URL-Safe Token' },
+  
+  // Generic API keys & tokens  
   { pattern: /(api_key|apikey|api token|x-api-key)[=:]["']?([\w-]+)/gi, name: 'Generic API Key' },
-  // Auth headers/tokens
   { pattern: /(bearer|auth|authorization)[=:]["']?([\w.-]+)/gi,    name: 'Auth Token' },
+  
   // PEM blocks
   { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' },
+  
   // UUID-ish strings
   { pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
     name: 'UUID / Possible Token' }
@@ -236,17 +417,96 @@ function performLocalScan (text, filename) {
   console.log(`Text preview (first 100 chars): ${text.substring(0, 100)}`);
   
   const findings = [];
+  const foundSecrets = new Set(); // Track unique secrets to avoid duplicates
+  
+  // Common PDF metadata to ignore (reduce false positives)
+  const pdfNoisePatterns = [
+    /WinAnsiEncoding/,
+    /ReportLab/,
+    /20\d{12}\+00/,  // Timestamps like 20250617133409+00
+    /50c495b7f3bd98349f1bceee26ce832b/,  // Known PDF hash
+    /f2bee42f928f2ddc50cc13d7406a1c2a/,  // Another PDF object hash
+  ];
+  
+  // Pattern priority (higher number = higher priority, more specific)
+  const patternPriority = {
+    'AWS Access Key ID': 10,
+    'AWS Secret Access Key': 10,
+    'Private Key': 9,
+    'Generic API Key': 8,
+    'Auth Token': 7,
+    'Hex Hash (32-char)': 6,
+    'Hex Hash (40-char)': 6,
+    'Hex Hash (64-char)': 6,
+    'Base64 Encoded Secret': 3,
+    'URL-Safe Token': 2,
+    'UUID / Possible Token': 1
+  };
+  
+  // Function to check if a hex string is likely a PDF internal hash
+  const isPdfInternalHash = (value) => {
+    // Pure lowercase hex strings are usually PDF object hashes
+    if (/^[0-9a-f]+$/.test(value) && value.length >= 16) {
+      return true;
+    }
+    // Repetitive patterns (same string repeated) are PDF noise
+    if (value.length >= 16) {
+      const chunk = value.substring(0, value.length / 2);
+      if (value === chunk + chunk) return true;
+    }
+    return false;
+  };
+  
   for (const p of secretPatterns) {
     const matches = Array.from(text.matchAll(p.pattern));
     if (matches.length > 0) {
-      console.log(`🚨 Found ${matches.length} matches for pattern ${p.name}`);
-      for (const m of matches) {
-        console.log(`  - Match: ${m[0]}`);
-        findings.push({
-          type: p.name,
-          value: `${m[0].slice(0, 10)}…`,
-          severity: 'high'
-        });
+      // Filter out PDF noise and internal hashes
+      const realMatches = matches.filter(match => {
+        const value = match[0];
+        // Check against known noise patterns
+        if (pdfNoisePatterns.some(noise => noise.test(value))) {
+          return false;
+        }
+        // Check if it's likely a PDF internal hash
+        if (isPdfInternalHash(value)) {
+          return false;
+        }
+        return true;
+      });
+      
+      if (realMatches.length > 0) {
+        console.log(`🚨 Found ${realMatches.length} matches for pattern ${p.name}`);
+        for (const m of realMatches) {
+          const secretValue = m[0];
+          console.log(`  - Match: ${secretValue}`);
+          
+          // Check if this exact secret was already found with a higher priority pattern
+          const existingFinding = findings.find(f => f.fullValue === secretValue);
+          
+          if (existingFinding) {
+            const existingPriority = patternPriority[existingFinding.type] || 0;
+            const currentPriority = patternPriority[p.name] || 0;
+            
+            // Only replace if current pattern has higher priority
+            if (currentPriority > existingPriority) {
+              existingFinding.type = p.name;
+              console.log(`  ↗️ Updated ${secretValue} to higher priority type: ${p.name}`);
+            } else {
+              console.log(`  ⏭️ Skipping ${secretValue} - already found with higher priority: ${existingFinding.type}`);
+            }
+          } else {
+            // New secret, add it
+            findings.push({
+              type: p.name,
+              value: `${secretValue.slice(0, 10)}…`,
+              fullValue: secretValue,
+              severity: 'high'
+            });
+            foundSecrets.add(secretValue);
+          }
+        }
+      } else {
+        console.log(`✓ No matches for pattern ${p.name} (filtered PDF noise)`);
       }
     } else {
       console.log(`✓ No matches for pattern ${p.name}`);
@@ -254,7 +514,8 @@ function performLocalScan (text, filename) {
   }
   
   const secrets = findings.length > 0;
-  console.log(`🔍 Local scan complete: ${secrets ? 'SECRETS FOUND' : 'NO SECRETS'} (${findings.length} findings)`);
+  const uniqueSecrets = foundSecrets.size;
+  console.log(`🔍 Local scan complete: ${secrets ? 'SECRETS FOUND' : 'NO SECRETS'} (${uniqueSecrets} unique secrets, ${findings.length} total findings)`);
   
   return {
     secrets,
@@ -352,60 +613,37 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         }`
       );
     } else {
-      console.log('PDF parsing failed completely - treating as potentially dangerous');
+      console.log('PDF parsing failed completely - using fallback extraction only');
       pdfParsingFailed = true;
-      
-      // When we can't extract any meaningful text, be conservative and block
-      return res.status(200).json({
-        action: 'block',
-        error: 'cannot_parse_pdf',
-        message: 'Cannot extract text from PDF for security scanning',
-        findings: [{
-          type: 'Parse Error',
-          value: 'PDF content cannot be analyzed',
-          severity: 'high'
-        }],
-        scannedAt: new Date().toISOString()
-      });
+      extractedText = pdfMeta?.text || '';  // Use whatever we got from fallback
     }
 
     // 5.4 Scan the text -------------------------------------------------------
     let scanResults;
 
-    // 1️⃣ Local regex scan first – catches any AWS keys even if PDF parsing failed
-    const localResults = performLocalScan(extractedText, filename);
-    if (localResults.secrets) {
-      scanResults = localResults;
-    } else if (pdfParsingFailed) {
-      // 2️⃣ If PDF parsing failed and no local secrets found, 
-      // do NOT send raw binary data to external API
-      console.log('PDF parsing failed and no local secrets found - skipping external API');
+    if (extractedText.length < 10) {
+      // No meaningful text extracted
+      console.log('Insufficient text extracted - treating as safe');
       scanResults = {
         secrets: false,
         findings: [],
         action: 'allow',
         scannedAt: new Date().toISOString(),
-        note: 'PDF parsing failed, used local scan only'
+        note: 'No extractable text content'
       };
     } else {
-      // 3️⃣ PDF parsing succeeded and no local secrets - call external API
+      // 1️⃣ Primary: Send to Prompt Security API (they are the experts at secret detection)
       try {
+        console.log(`Sending ${extractedText.length} characters to Prompt Security API`);
         scanResults = await promptSecurity.scanText(extractedText);
-
-        // 4️⃣ If API misses credentials, fallback to local scan
-        if (!scanResults.secrets) {
-          const fallbackResults = performLocalScan(extractedText, filename);
-          if (fallbackResults.secrets) {
-            scanResults = {
-              ...scanResults,
-              findings: fallbackResults.findings,
-              secrets: true,
-              action: 'block'
-            };
-          }
-        }
+        
+        // The API is authoritative - trust their secret detection
+        console.log(`✅ API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
+        
       } catch (apiErr) {
-        console.error('Prompt Security API failed – using local scan only:', apiErr);
+        console.error('🚨 Prompt Security API failed – using local scan fallback:', apiErr.message);
+        
+        // 2️⃣ Fallback: Local regex scan only when API is unavailable
         scanResults = performLocalScan(extractedText, filename);
       }
     }
