@@ -3,6 +3,7 @@
  */
 
 const { AppError } = require('../middleware/errorHandler');
+const logger = require('../utils/logger');
 
 class PromptSecurityClient {
   constructor() {
@@ -17,7 +18,7 @@ class PromptSecurityClient {
     this.timeout = 30000; // 30 seconds
     
     if (!this.appId) {
-      console.warn('PROMPT_SECURITY_APP_ID not set in environment variables');
+      logger.warn('PROMPT_SECURITY_APP_ID not set in environment variables');
     }
   }
 
@@ -37,7 +38,7 @@ class PromptSecurityClient {
       ? text.substring(0, maxTextLength) + '... [truncated]' 
       : text;
 
-    console.log(`Sending ${truncatedText.length} characters to Prompt Security API`);
+    logger.debug(`Sending ${truncatedText.length} characters to Prompt Security API`);
 
     let attempt = 0;
     let lastError = null;
@@ -46,7 +47,7 @@ class PromptSecurityClient {
     while (attempt < this.maxRetries) {
       try {
         attempt++;
-        console.log(`API attempt ${attempt} of ${this.maxRetries}`);
+        logger.debug(`API attempt ${attempt} of ${this.maxRetries}`);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -66,19 +67,19 @@ class PromptSecurityClient {
         // Handle non-200 responses
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`API returned status ${response.status}: ${errorText}`);
+          logger.error(`API returned status ${response.status}: ${errorText}`);
           throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
 
         // Parse and format response
         const data = await response.json();
-        console.log('Raw API response:', JSON.stringify(data));
+        logger.debug('Raw API response:', JSON.stringify(data));
         
         // Map API response to our expected format
         return this.mapApiResponse(data);
       } catch (error) {
         lastError = error;
-        console.error(`API attempt ${attempt} failed:`, error.message);
+        logger.error(`API attempt ${attempt} failed:`, error.message);
 
         // Don't retry if it's a client error
         if (error.message.includes('400') || error.message.includes('401') || 
@@ -88,14 +89,14 @@ class PromptSecurityClient {
 
         if (attempt < this.maxRetries) {
           const delay = this.baseDelay * Math.pow(2, attempt - 1);
-          console.log(`Retrying in ${delay}ms...`);
+          logger.debug(`Retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }
 
     // If we get here, all attempts failed
-    console.error('API calls failed, falling back to local scanning');
+    logger.error('API calls failed, falling back to local scanning');
     return {
       secrets: false,
       findings: [],
@@ -176,25 +177,25 @@ class PromptSecurityClient {
       // Violations are in result.prompt.violations, not result.violations
       const violations = result.prompt?.violations || result.violations || [];
       
-      console.log(`Checking violations - hasSecrets: ${hasSecrets}, action: ${action}`);
-      console.log(`Violations found:`, violations);
+      logger.debug(`Checking violations - hasSecrets: ${hasSecrets}, action: ${action}`);
+      logger.debug(`Violations found:`, violations);
       
       // Check for explicit secret violations ONLY
       if (violations && Array.isArray(violations) && violations.includes('Secrets')) {
-        console.log('Secret violations detected in result');
+        logger.info('Secret violations detected in result');
         hasSecrets = true;
       }
       
       // Only block if we actually found secrets, not for prompt injection or other violations
       if (hasSecrets) {
-        console.log('Blocking content due to actual secrets found');
+        logger.warn('Blocking content due to actual secrets found');
       } else if (action === 'block') {
-        console.log('API wants to block content, but no secrets found - allowing through');
-        console.log('Non-secret violations:', violations || 'policy violations');
+        logger.info('API wants to block content, but no secrets found - allowing through');
+        logger.debug('Non-secret violations:', violations || 'policy violations');
         
         // Log the violations but don't treat as secrets
         if (violations && violations.length > 0) {
-          console.log('Non-blocking violations detected:', violations.join(', '));
+          logger.info('Non-blocking violations detected:', violations.join(', '));
         }
       }
 
@@ -206,7 +207,7 @@ class PromptSecurityClient {
         apiVersion: result.version || '1.0'
       };
     } catch (error) {
-      console.error('Error mapping API response:', error);
+      logger.error('Error mapping API response:', error);
       
       // Return a safe default response
       return {

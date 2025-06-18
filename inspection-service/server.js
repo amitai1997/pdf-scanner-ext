@@ -1,5 +1,5 @@
 /**
- * PDF Scanner Inspection Service – Redrafted June 18 2025
+ * PDF Scanner Inspection Service – Production Ready
  * Express server that processes PDFs and checks them for secrets without ever
  * returning an HTTP-500 to the browser.
  */
@@ -21,6 +21,7 @@ const ascii85   = require('ascii85');
 // Internal modules
 const { errorHandler, AppError } = require('./middleware/errorHandler');
 const PromptSecurityClient       = require('./services/promptSecurityClient');
+const logger                     = require('./utils/logger');
 
 // Configuration
 const PORT      = process.env.INSPECTION_PORT || 3001;
@@ -46,18 +47,18 @@ async function extractPDFTextDeterministic(buffer, filename) {
   const bufferHash = crypto.createHash('sha256').update(buffer).digest('hex');
   const cacheKey = `${filename}_${bufferHash}_${buffer.length}`;
   
-  console.log(`📄 PDF parsing request: ${filename}`);
+  logger.debug(`PDF parsing request: ${filename}`);
   
   // Check cache first
   if (pdfParseCache.has(cacheKey)) {
     const cached = pdfParseCache.get(cacheKey);
-    console.log(`📋 Using cached result for ${filename}`);
+    logger.debug(`Using cached result for ${filename}`);
     return cached;
   }
   
       // Check if there's already a parsing operation in progress for this file
     if (pdfParsePromises.has(cacheKey)) {
-      console.log(`⏳ Waiting for ongoing parse: ${filename}`);
+      logger.debug(`Waiting for ongoing parse: ${filename}`);
       return await pdfParsePromises.get(cacheKey);
     }
   
@@ -84,10 +85,10 @@ async function extractPDFTextDeterministic(buffer, filename) {
           info: standardResult.info,
           numpages: standardResult.numpages
         };
-        console.log(`✅ Standard PDF parsing: ${result.text.length} chars`);
+        logger.info(`Standard PDF parsing: ${result.text.length} chars`);
       }
     } catch (error) {
-              console.log(`⚠️  Standard parsing failed: ${error.message}`);
+              logger.warn(`Standard parsing failed: ${error.message}`);
     }
     
     // Strategy 2: Try alternative parsing if standard failed
@@ -100,16 +101,16 @@ async function extractPDFTextDeterministic(buffer, filename) {
             info: altResult.info,
             numpages: altResult.numpages
           };
-          console.log(`✅ Alternative parsing: ${result.text.length} chars`);
+          logger.info(`Alternative parsing: ${result.text.length} chars`);
         }
       } catch (error) {
-        console.log(`⚠️  Alternative parsing failed: ${error.message}`);
+        logger.warn(`Alternative parsing failed: ${error.message}`);
       }
     }
     
     // Strategy 3: Advanced fallback extraction if both parsing methods failed
     if (!result) {
-      console.log('Attempting advanced fallback text extraction...');
+      logger.debug('Attempting advanced fallback text extraction...');
       
       // Convert buffer to different string formats for analysis
       const binaryString = buffer.toString('binary');
@@ -125,7 +126,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         const streamMatches = binaryString.match(streamPattern);
         
         if (streamMatches) {
-          console.log(`📦 Processing ${streamMatches.length} stream objects...`);
+          logger.debug(`Processing ${streamMatches.length} stream objects...`);
           
           for (const streamMatch of streamMatches) {
             try {
@@ -134,7 +135,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
               
               // Handle ASCII85 + FlateDecode sequence
               if (streamData.includes('~>')) {
-                console.log('🔍 ASCII85 + FlateDecode stream detected...');
+                logger.debug('ASCII85 + FlateDecode stream detected...');
                 
                 try {
                   // Extract ASCII85 content (everything before '~>')
@@ -145,24 +146,24 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   const decompressed = zlib.inflateSync(decoded);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  console.log(`✅ Decoded content: "${decompressedText}"`);
+                  logger.debug(`Decoded content: "${decompressedText}"`);
                   
                   // Check if this contains our AWS key
                   if (decompressedText.includes('AKIA')) {
-                    console.log(`🔑 AWS key found in decoded content!`);
+                    logger.info(`AWS key found in decoded content!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
                   } else {
                     extractedText += ' ' + decompressedText;
                   }
                 } catch (decodeError) {
-                  console.log(`⚠️  ASCII85+FlateDecode decode failed: ${decodeError.message}`);
+                  logger.warn(`ASCII85+FlateDecode decode failed: ${decodeError.message}`);
                   
                   // Fallback: search for patterns in the raw ASCII85 data
                   const awsInStream = streamData.match(/AKIA[A-Z0-9]{16}/g);
                   if (awsInStream) {
                     extractedText += ' ' + awsInStream.join(' ');
-                    console.log(`🔑 Found AWS keys in raw ASCII85 stream: ${awsInStream.join(', ')}`);
+                    logger.info(`Found AWS keys in raw ASCII85 stream: ${awsInStream.join(', ')}`);
                   }
                 }
               } else {
@@ -172,27 +173,27 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   const decompressed = zlib.inflateSync(streamBytes);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  console.log(`✅ FlateDecode: "${decompressedText}"`);
+                  logger.debug(`FlateDecode: "${decompressedText}"`);
                   
                   // Check if this contains our AWS key
                   if (decompressedText.includes('AKIA')) {
-                    console.log(`🔑 AWS key found!`);
+                    logger.info(`AWS key found!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
                   } else {
                     extractedText += ' ' + decompressedText;
                   }
                 } catch (decompError) {
-                  console.log(`⚠️  FlateDecode decompression failed: ${decompError.message}`);
+                  logger.warn(`FlateDecode decompression failed: ${decompError.message}`);
                 }
               }
             } catch (e) {
-              console.log(`⚠️  Error processing stream: ${e.message}`);
+              logger.warn(`Error processing stream: ${e.message}`);
             }
           }
         }
       } catch (e) {
-        console.log(`⚠️  Error in stream decompression: ${e.message}`);
+        logger.warn(`Error in stream decompression: ${e.message}`);
       }
       
       // 1. Look for direct secret patterns in binary data FIRST  
@@ -227,13 +228,13 @@ async function extractPDFTextDeterministic(buffer, filename) {
       // PRIORITIZE actual secrets over metadata
       if (awsKeys.length > 0) {
         extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
-        console.log(`🔑 AWS keys found: ${awsKeys.join(', ')}`);
+        logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
       } else if (secrets.length > 0) {
         // Filter out short matches and PDF noise
         const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
         if (realSecrets.length > 0) {
           extractedText = realSecrets.join(' '); // Use ONLY the secrets
-          console.log(`🔑 Potential secrets found: ${realSecrets.length} matches`);
+          logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
         }
       } else if (compressedSecrets.length > 0) {
         // Only use compressed secrets if no direct secrets found
@@ -247,7 +248,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         
         if (filteredSecrets.length > 0) {
           extractedText = filteredSecrets.slice(0, 5).join(' '); // Take top 5
-          console.log(`🗜️  Compressed secrets found: ${filteredSecrets.length} matches`);
+          logger.debug(`Compressed secrets found: ${filteredSecrets.length} matches`);
         }
       }
       
@@ -268,7 +269,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         
         if (actualContent.length > 0) {
           extractedText += ' ' + actualContent.join(' ');
-          console.log(`📄 Readable content: ${actualContent.length} blocks`);
+          logger.debug(`Readable content: ${actualContent.length} blocks`);
         }
         
         // 3. Last resort: extract longer alphanumeric sequences (but skip PDF noise)
@@ -284,12 +285,12 @@ async function extractPDFTextDeterministic(buffer, filename) {
           
           if (alphaMatches.length > 0) {
             extractedText += ' ' + alphaMatches.join(' ');
-            console.log(`🔤 Alphanumeric sequences: ${alphaMatches.length} matches`);
+            logger.debug(`Alphanumeric sequences: ${alphaMatches.length} matches`);
           }
         }
       }
       
-      console.log(`🔍 Extracted ${extractedText.length} chars: ${extractedText.substring(0, 100)}...`);
+      logger.debug(`Extracted ${extractedText.length} chars: ${extractedText.substring(0, 100)}...`);
       
       // Clean up the extracted text
       extractedText = extractedText.replace(/\s+/g, ' ').trim();
@@ -300,9 +301,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
           info: { fallback: true },
           numpages: 1
         };
-        console.log(`Fallback extraction found ${result.text.length} characters of content`);
+        logger.info(`Fallback extraction found ${result.text.length} characters of content`);
       } else {
-        console.log(`⚠️  Fallback extraction found insufficient content (${extractedText.length} chars)`);
+        logger.warn(`Fallback extraction found insufficient content (${extractedText.length} chars)`);
       }
     }
     
@@ -318,7 +319,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
       // Cache even the error result to ensure consistency
       pdfParseCache.set(cacheKey, errorResult);
       resolveParsePromise(errorResult);
-      console.log(`💾 Cached error result for ${filename}: no extractable text`);
+      logger.warn(`Cached error result for ${filename}: no extractable text`);
       
       return errorResult;
     }
@@ -347,7 +348,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
     
     // Cache the error result to ensure consistency
     pdfParseCache.set(cacheKey, errorResult);
-    console.log(`💾 Cached error result for ${filename}: ${error.message}`);
+    logger.warn(`Cached error result for ${filename}: ${error.message}`);
     
     // Resolve with error result instead of rejecting
     resolveParsePromise(errorResult);
@@ -381,7 +382,7 @@ const secretPatterns = [
  * Perform a local regex scan (used when the upstream API is unavailable).
  */
 function performLocalScan (text, filename) {
-  console.log(`🔍 Local regex scan: ${text.length} chars`);
+  logger.debug(`Local regex scan: ${text.length} chars`);
   
   const findings = [];
   const foundSecrets = new Set(); // Track unique secrets to avoid duplicates
@@ -438,7 +439,7 @@ function performLocalScan (text, filename) {
       });
       
       if (realMatches.length > 0) {
-        console.log(`🚨 Found ${realMatches.length} matches: ${p.name}`);
+        logger.debug(`Found ${realMatches.length} matches: ${p.name}`);
         for (const m of realMatches) {
           const secretValue = m[0];
           
@@ -470,7 +471,7 @@ function performLocalScan (text, filename) {
   
   const secrets = findings.length > 0;
   const uniqueSecrets = foundSecrets.size;
-  console.log(`🔍 Local scan complete: ${secrets ? 'SECRETS FOUND' : 'NO SECRETS'} (${uniqueSecrets} unique secrets, ${findings.length} total findings)`);
+  logger.info(`Local scan complete: ${secrets ? 'SECRETS FOUND' : 'NO SECRETS'} (${uniqueSecrets} unique secrets, ${findings.length} total findings)`);
   
   return {
     secrets,
@@ -501,7 +502,7 @@ const upload = multer({
 
 // Request logger
 app.use((req, _res, next) => {
-  console.log(`${new Date().toISOString()} [${req.method}] ${req.originalUrl}`);
+  logger.logRequest(req);
   next();
 });
 
@@ -524,7 +525,7 @@ app.get('/health', (_req, res) => {
 // Main scan endpoint
 app.post('/scan', upload.single('pdf'), async (req, res, next) => {
   try {
-    console.log(`\n— PDF scan requested at ${new Date().toISOString()} —`);
+    logger.info(`PDF scan requested at ${new Date().toISOString()}`);
 
     // 5.1 Input validation ----------------------------------------------------
     if (!req.file) {
@@ -532,7 +533,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     }
 
     const { originalname: filename, size, mimetype, buffer } = req.file;
-    console.log('File info:', { filename, size, mimetype });
+    logger.info('File info:', { filename, size, mimetype });
 
     // Reject zero-byte uploads early (duplicate intercepted request)
     if (size === 0) {
@@ -562,13 +563,13 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     
     if (pdfMeta && pdfMeta.text && !pdfMeta.parseError) {
       extractedText = pdfMeta.text;
-      console.log(
+      logger.info(
         `PDF Info – version: ${pdfMeta.info?.PDFFormatVersion ?? 'n/a'}, pages: ${
           pdfMeta.numpages
         }`
       );
     } else {
-      console.log('PDF parsing failed completely - using fallback extraction only');
+      logger.warn('PDF parsing failed completely - using fallback extraction only');
       pdfParsingFailed = true;
       extractedText = pdfMeta?.text || '';  // Use whatever we got from fallback
     }
@@ -578,7 +579,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
 
     if (extractedText.length < 10) {
       // No meaningful text extracted
-      console.log('Insufficient text extracted - treating as safe');
+      logger.info('Insufficient text extracted - treating as safe');
       scanResults = {
         secrets: false,
         findings: [],
@@ -589,14 +590,14 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     } else {
       // 1️⃣ Primary: Send to Prompt Security API (they are the experts at secret detection)
       try {
-        console.log(`Sending ${extractedText.length} characters to Prompt Security API`);
+        logger.info(`Sending ${extractedText.length} characters to Prompt Security API`);
         scanResults = await promptSecurity.scanText(extractedText);
         
         // The API is authoritative - trust their secret detection
-        console.log(`✅ API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
+        logger.info(`API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
         
       } catch (apiErr) {
-        console.error('🚨 Prompt Security API failed – using local scan fallback:', apiErr.message);
+        logger.error('Prompt Security API failed – using local scan fallback:', apiErr.message);
         
         // 2️⃣ Fallback: Local regex scan only when API is unavailable
         scanResults = performLocalScan(extractedText, filename);
@@ -625,9 +626,9 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
 // ---------------------------------------------------------------------------
 app.use(errorHandler);
 
-process.on('unhandledRejection', err => console.error('UNHANDLED REJECTION', err));
+process.on('unhandledRejection', err => logger.error('UNHANDLED REJECTION', err));
 process.on('uncaughtException',  err => {
-  console.error('UNCAUGHT EXCEPTION', err);
+  logger.error('UNCAUGHT EXCEPTION', err);
   if (NODE_ENV === 'production') process.exit(1);
 });
 
@@ -635,8 +636,8 @@ process.on('uncaughtException',  err => {
 // 7. Start server
 // ---------------------------------------------------------------------------
 app.listen(PORT, () => {
-  console.log(`\n🔒 PDF Inspection Service running on port ${PORT}`);
-  console.log(`🌍 Environment: ${NODE_ENV}`);
-  console.log(`📅 Started at:  ${new Date().toISOString()}`);
-  console.log('💻 API Endpoints:\n   – GET  /health\n   – POST /scan\n');
+  logger.info(`PDF Inspection Service running on port ${PORT}`);
+  logger.info(`Environment: ${NODE_ENV}`);
+  logger.info(`Started at: ${new Date().toISOString()}`);
+  logger.info('API Endpoints available: GET /health, POST /scan');
 });

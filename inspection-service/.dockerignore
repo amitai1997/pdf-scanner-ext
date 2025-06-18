@@ -1,0 +1,21 @@
+# Node modules (will be installed in container)
+node_modules/
+npm-debug.log*
+
+# Environment files (will be mounted or set via docker-compose)
+.env*
+
+# Debug files
+debug/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md 

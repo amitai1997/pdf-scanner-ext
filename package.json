@@ -8,12 +8,15 @@
     "lint": "eslint src/ --ext .js",
     "lint:fix": "eslint src/ --ext .js --fix",
     "format": "prettier --write src/**/*.js public/**/*.{html,css}",
-    "dev:extension": "web-ext run --source-dir . --target chromium",
-    "dev": "npm run dev:extension",
-    "build": "web-ext build --source-dir . --artifacts-dir dist",
+    "dev": "npm run dev:service",
+    "dev:service": "cd inspection-service && npm run dev",
+    "dev:docker": "docker-compose up",
     "test": "echo \"No tests configured\"",
     "validate": "web-ext lint --source-dir .",
-    "clean": "rm -rf dist/ web-ext-artifacts/"
+    "clean": "rm -rf dist/ web-ext-artifacts/",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f inspection-service"
   },
   "keywords": [
     "chrome-extension",

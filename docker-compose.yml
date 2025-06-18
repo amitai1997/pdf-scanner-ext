@@ -1,0 +1,44 @@
+# Docker Compose for PDF Scanner Extension - Development Only
+# 
+# Usage:
+#   Start development: npm run dev:docker
+#   View logs: docker-compose logs -f
+#   Stop: docker-compose down
+
+version: '3.8'
+
+services:
+  # PDF Inspection Service - Development Mode
+  inspection-service:
+    build:
+      context: ./inspection-service
+      dockerfile: Dockerfile
+    container_name: pdf-scanner-inspection-dev
+    ports:
+      - "3001:3001"  # Map container port 3001 to host port 3001
+    environment:
+      - NODE_ENV=development
+      - INSPECTION_PORT=3001
+      - PORT=3001
+      # Prompt Security API configuration (optional - set these in .env)
+      - PROMPT_SECURITY_APP_ID=${PROMPT_SECURITY_APP_ID:-}
+      - PROMPT_SECURITY_API_KEY=${PROMPT_SECURITY_API_KEY:-}
+    volumes:
+      # Mount source code for hot-reload during development
+      - ./inspection-service:/app:cached
+      - /app/node_modules  # Anonymous volume to preserve node_modules
+    env_file:
+      - ./inspection-service/.env  # Load environment variables from .env file (if exists)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+# Development notes:
+# 1. Create a .env file in the inspection-service directory for API keys
+# 2. The service will restart automatically when you change code files  
+# 3. Access the service at: http://localhost:3001/health
+# 4. Extension will connect to this service automatically 

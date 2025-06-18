@@ -2,6 +2,8 @@
  * Global error handler for the PDF inspection service
  */
 
+const logger = require('../utils/logger');
+
 class AppError extends Error {
   constructor(message, statusCode = 500, validationErrors = null) {
     super(message);
@@ -14,8 +16,8 @@ class AppError extends Error {
 
 const errorHandler = (err, req, res, next) => {
   // Log the error
-  console.error('Error:', err.message);
-  console.error(err.stack);
+  logger.error('Error:', err.message);
+  logger.error(err.stack);
 
   // Set appropriate status code
   const statusCode = err.statusCode || 500;
