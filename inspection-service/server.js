@@ -360,126 +360,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
   }
 }
 
-/** Local secret detection patterns (fallback when API unavailable) */
-const secretPatterns = [
-  // AWS keys (specific)
-  { pattern: /AKIA[0-9A-Z]{16}/g,                                   name: 'AWS Access Key ID' },
-  { pattern: /[0-9a-zA-Z/+]{40}/g,                                  name: 'AWS Secret Access Key' },
-  
-  // Base64-like patterns
-  { pattern: /[A-Za-z0-9+/]{16,}={0,2}/g,                          name: 'Base64 Encoded Secret' },
-  { pattern: /[A-Za-z0-9_-]{15,25}/g,                              name: 'URL-Safe Token' },
-  
-  // Generic API keys & tokens  
-  { pattern: /(api_key|apikey|api token|x-api-key)[=:]["']?([\w-]+)/gi, name: 'Generic API Key' },
-  { pattern: /(bearer|auth|authorization)[=:]["']?([\w.-]+)/gi,    name: 'Auth Token' },
-  
-  // PEM blocks
-  { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' }
-];
+// Secret patterns removed - now using Prompt Security API exclusively
 
-/**
- * Perform a local regex scan (used when the upstream API is unavailable).
- */
-function performLocalScan (text, filename) {
-  logger.debug(`Local regex scan: ${text.length} chars`);
-  
-  const findings = [];
-  const foundSecrets = new Set(); // Track unique secrets to avoid duplicates
-  
-  // Common PDF metadata to ignore (reduce false positives)
-  const pdfNoisePatterns = [
-    /WinAnsiEncoding/,
-    /ReportLab/,
-    /20\d{12}\+00/,  // Timestamps like 20250617133409+00
-    /50c495b7f3bd98349f1bceee26ce832b/,  // Known PDF hash
-    /f2bee42f928f2ddc50cc13d7406a1c2a/,  // Another PDF object hash
-  ];
-  
-  // Pattern priority (higher number = higher priority, more specific)
-  const patternPriority = {
-    'AWS Access Key ID': 10,
-    'AWS Secret Access Key': 10,
-    'Private Key': 9,
-    'Generic API Key': 8,
-    'Auth Token': 7,
-    'Base64 Encoded Secret': 3,
-    'URL-Safe Token': 2
-  };
-  
-  // Function to check if a hex string is likely a PDF internal hash
-  const isPdfInternalHash = (value) => {
-    // Pure lowercase hex strings are usually PDF object hashes
-    if (/^[0-9a-f]+$/.test(value) && value.length >= 16) {
-      return true;
-    }
-    // Repetitive patterns (same string repeated) are PDF noise
-    if (value.length >= 16) {
-      const chunk = value.substring(0, value.length / 2);
-      if (value === chunk + chunk) return true;
-    }
-    return false;
-  };
-  
-  for (const p of secretPatterns) {
-    const matches = Array.from(text.matchAll(p.pattern));
-    if (matches.length > 0) {
-      // Filter out PDF noise and internal hashes
-      const realMatches = matches.filter(match => {
-        const value = match[0];
-        // Check against known noise patterns
-        if (pdfNoisePatterns.some(noise => noise.test(value))) {
-          return false;
-        }
-        // Check if it's likely a PDF internal hash
-        if (isPdfInternalHash(value)) {
-          return false;
-        }
-        return true;
-      });
-      
-      if (realMatches.length > 0) {
-        logger.debug(`Found ${realMatches.length} matches: ${p.name}`);
-        for (const m of realMatches) {
-          const secretValue = m[0];
-          
-          // Check if this exact secret was already found with a higher priority pattern
-          const existingFinding = findings.find(f => f.fullValue === secretValue);
-          
-          if (existingFinding) {
-            const existingPriority = patternPriority[existingFinding.type] || 0;
-            const currentPriority = patternPriority[p.name] || 0;
-            
-            // Only replace if current pattern has higher priority
-            if (currentPriority > existingPriority) {
-              existingFinding.type = p.name;
-            }
-          } else {
-            // New secret, add it
-            findings.push({
-              type: p.name,
-              value: `${secretValue.slice(0, 10)}…`,
-              fullValue: secretValue,
-              severity: 'high'
-            });
-            foundSecrets.add(secretValue);
-          }
-        }
-      }
-    }
-  }
-  
-  const secrets = findings.length > 0;
-  const uniqueSecrets = foundSecrets.size;
-  logger.info(`Local scan complete: ${secrets ? 'SECRETS FOUND' : 'NO SECRETS'} (${uniqueSecrets} unique secrets, ${findings.length} total findings)`);
-  
-  return {
-    secrets,
-    findings,
-    action: secrets ? 'block' : 'allow',
-    scannedAt: new Date().toISOString()
-  };
-}
+// performLocalScan function removed - now using Prompt Security API exclusively
 
 // ---------------------------------------------------------------------------
 // 4. Middleware stack
@@ -588,7 +471,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         note: 'No extractable text content'
       };
     } else {
-      // 1️⃣ Primary: Send to Prompt Security API (they are the experts at secret detection)
+      // Send to Prompt Security API (single source of truth)
       try {
         logger.info(`Sending ${extractedText.length} characters to Prompt Security API`);
         scanResults = await promptSecurity.scanText(extractedText);
@@ -597,10 +480,16 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         logger.info(`API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
         
       } catch (apiErr) {
-        logger.error('Prompt Security API failed – using local scan fallback:', apiErr.message);
+        logger.warn('Prompt Security API unavailable – allowing upload:', apiErr.message);
         
-        // 2️⃣ Fallback: Local regex scan only when API is unavailable
-        scanResults = performLocalScan(extractedText, filename);
+        // Graceful fallback: Allow upload when API is unavailable
+        scanResults = {
+          secrets: false,
+          findings: [],
+          action: 'allow',
+          scannedAt: new Date().toISOString(),
+          note: 'API unavailable - upload permitted'
+        };
       }
     }
 

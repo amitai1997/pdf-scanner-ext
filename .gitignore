@@ -108,3 +108,5 @@ test_*.pdf
 *_secrets.pdf
 AKIAIOSFODNN7EXAMPLE.pdf
 file_with_secrest.pdf
+
+.cursorignore
