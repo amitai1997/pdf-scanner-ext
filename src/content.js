@@ -1188,6 +1188,10 @@ class PDFMonitor {
         border-radius: 4px;
         margin-bottom: 20px;
         color: #333;
+        max-height: 300px;
+        overflow: auto;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
       `;
       
       // Create findings title
@@ -1228,13 +1232,11 @@ class PDFMonitor {
           
           // Create more detailed finding information
           if (finding.type === 'Secret' && finding.value) {
-            // For secrets, show the type and redacted value
+            // For secrets, show the type and FULL value (no truncation)
             let displayText = `<strong>${finding.entity_type || finding.type}</strong>`;
             
-            // For AWS keys and similar, show a redacted version
-            if (finding.value && finding.value.includes('AKIAIOSFOD')) {
-              displayText += `: AKIAIOSFOD...`;
-            } else if (finding.value) {
+            // Show the full secret value (no more truncation)
+            if (finding.value) {
               displayText += `: ${finding.value}`;
             }
             
@@ -1256,6 +1258,9 @@ class PDFMonitor {
           findingEl.style.cssText = `
             margin-bottom: 8px;
             color: #333;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
           `;
           
           findingsListEl.appendChild(findingEl);
