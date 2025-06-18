@@ -1,7 +1,7 @@
 /**
- * PDF Scanner Inspection Service – Redrafted June 18 2025
+ * PDF Scanner Inspection Service – Redrafted June 18 2025
  * Express server that processes PDFs and checks them for secrets without ever
- * returning an HTTP‑500 to the browser.
+ * returning an HTTP-500 to the browser.
  */
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ const app            = express();
 // ---------------------------------------------------------------------------
 // 3. Utilities
 // ---------------------------------------------------------------------------
-/** Retry‑extract text from a PDF buffer with exponential back‑off. */
+/** Retry-extract text from a PDF buffer with exponential back-off. */
 async function extractPDFTextWithRetry (buffer, filename, maxRetries = 3) {
   let lastError;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -55,15 +55,18 @@ async function extractPDFTextWithRetry (buffer, filename, maxRetries = 3) {
       console.error(`PDF parse attempt ${attempt} failed: ${error.message}`);
       if (attempt < maxRetries) {
         const delay = 100 * 2 ** (attempt - 1);
-        console.log(`Waiting ${delay} ms before retry …`);
+        console.log(`Waiting ${delay} ms before retry …`);
         await new Promise(r => setTimeout(r, delay));
       }
     }
   }
-  throw new AppError(`Failed to extract text from PDF after ${maxRetries} attempts: ${lastError.message}`, 500);
+  throw new AppError(
+    `Failed to extract text from PDF after ${maxRetries} attempts: ${lastError.message}`,
+    500
+  );
 }
 
-/** Simple local regex‑based fallback patterns.  */
+/** Simple local regex-based fallback patterns.  */
 const secretPatterns = [
   // AWS keys
   { pattern: /AKIA[0-9A-Z]{16}/g,                                   name: 'AWS Access Key ID' },
@@ -74,7 +77,7 @@ const secretPatterns = [
   { pattern: /(bearer|auth|authorization)[=:]["']?([\w.-]+)/gi,    name: 'Auth Token' },
   // PEM blocks
   { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' },
-  // UUID‑ish strings
+  // UUID-ish strings
   { pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
     name: 'UUID / Possible Token' }
 ];
@@ -122,10 +125,10 @@ app.use(cors({
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Multer upload (in‑memory)
+// Multer upload (in-memory)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits:  { fileSize: 20 * 1024 * 1024 } // 20 MB
+  limits:  { fileSize: 20 * 1024 * 1024 } // 20 MB
 });
 
 // Request logger
@@ -134,15 +137,20 @@ app.use((req, _res, next) => {
   next();
 });
 
-// OPTIONS pre‑flight
+// OPTIONS pre-flight
 app.options('*', (_req, res) => res.status(200).end());
 
 // ---------------------------------------------------------------------------
 // 5. Endpoints
 // ---------------------------------------------------------------------------
-// Health‑check
+// Health-check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString(), environment: NODE_ENV });
+  res.json({
+    status: 'ok',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    environment: NODE_ENV
+  });
 });
 
 // Main scan endpoint
@@ -156,10 +164,9 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     }
 
     const { originalname: filename, size, mimetype, buffer } = req.file;
-
     console.log('File info:', { filename, size, mimetype });
 
-    // Reject zero‑byte uploads early (duplicate intercepted request)
+    // Reject zero-byte uploads early (duplicate intercepted request)
     if (size === 0) {
       return res.status(400).json({
         action: 'block',
@@ -180,17 +187,18 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     // 5.3 Parse the PDF (with retry) -----------------------------------------
     let extractedText = '';
     let pdfMeta;
-
     try {
       pdfMeta       = await extractPDFTextWithRetry(buffer, filename);
       extractedText = pdfMeta.text;
-      console.log(`PDF Info – version: ${pdfMeta.info?.PDFFormatVersion ?? 'n/a'}, pages: ${pdfMeta.numpages}`);
+      console.log(
+        `PDF Info – version: ${pdfMeta.info?.PDFFormatVersion ?? 'n/a'}, pages: ${
+          pdfMeta.numpages
+        }`
+      );
     } catch (parseErr) {
       console.error('PDF extraction failed:', parseErr.message);
-
-      // Raw‑buffer fallback
+      // Raw-buffer fallback
       extractedText = buffer.toString('utf8');
-
       if (!extractedText || extractedText.trim().length === 0) {
         return res.status(200).json({
           action: 'block',
@@ -204,30 +212,38 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     // 5.4 Scan the text -------------------------------------------------------
     let scanResults;
 
-    try {
-      scanResults = await promptSecurity.scanText(extractedText);
-    } catch (apiErr) {
-      console.error('Prompt Security API failed, falling back to local scan:', apiErr.message);
-      scanResults = performLocalScan(extractedText, filename);
+    // 1️⃣ Local regex scan first – catches any AWS keys even if PDF parsing failed
+    const localResults = performLocalScan(extractedText, filename);
+    if (localResults.secrets) {
+      scanResults = localResults;
+    } else {
+      // 2️⃣ No local secrets found, so call the Prompt Security API
+      try {
+        scanResults = await promptSecurity.scanText(extractedText);
+
+        // 3️⃣ If API misses credentials, fallback to local scan
+        if (!scanResults.secrets) {
+          const fallbackResults = performLocalScan(extractedText, filename);
+          if (fallbackResults.secrets) {
+            scanResults = {
+              ...scanResults,
+              findings: fallbackResults.findings,
+              secrets: true,
+              action: 'block'
+            };
+          }
+        }
+      } catch (apiErr) {
+        console.error('Prompt Security API failed – using local scan only:', apiErr);
+        scanResults = performLocalScan(extractedText, filename);
+      }
     }
 
     // 5.5 Respond -------------------------------------------------------------
-    // Only treat genuine “secrets” (AWS keys, tokens, ARNs) as blockable
-    const secretsFound = (scanResults.findings || []).some(f => {
-      return (
-        f.category === 'Access Tokens' ||
-        f.category === 'API Keys' ||
-        f.entity_type === 'AWS credentials' ||
-        f.entity_type === 'AWS Access Key ID' ||
-        f.entity_type === 'AWS Secret Access Key' ||
-        f.entity_type === 'AWS session token' ||
-        f.entity_type === 'AWS ARN' ||
-        f.entity_type === 'AWS secret key credentials'
-      );
-    });
+    const secretsFound = scanResults.secrets === true;
     const action = secretsFound ? 'block' : 'allow';
-
-    // Return the scan result (PII-only findings will not block)
+    
+    // Return the scan result
     res.status(200).json({
       secrets: secretsFound,
       findings: scanResults.findings,
