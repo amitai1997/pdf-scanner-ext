@@ -1,23 +1,19 @@
-# Docker Compose for PDF Scanner Extension - Local Development
+# Docker Compose for PDF Scanner Extension - Development Only
 # 
 # Usage:
-#   Development mode with hot-reload: docker-compose up
-#   Production mode: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
-#   Rebuild after code changes: docker-compose up --build
-#   Run in background: docker-compose up -d
-#   Stop services: docker-compose down
-#   View logs: docker-compose logs -f inspection-service
+#   Start development: npm run dev:docker
+#   View logs: docker-compose logs -f
+#   Stop: docker-compose down
 
 version: '3.8'
 
 services:
-  # PDF Inspection Service
+  # PDF Inspection Service - Development Mode
   inspection-service:
     build:
       context: ./inspection-service
       dockerfile: Dockerfile
-      target: development  # Use development stage for hot-reload
-    container_name: pdf-scanner-inspection
+    container_name: pdf-scanner-inspection-dev
     ports:
       - "3001:3001"  # Map container port 3001 to host port 3001
     environment:
@@ -32,28 +28,17 @@ services:
       - ./inspection-service:/app:cached
       - /app/node_modules  # Anonymous volume to preserve node_modules
     env_file:
-      - ./inspection-service/.env  # Load environment variables from .env file
+      - ./inspection-service/.env  # Load environment variables from .env file (if exists)
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     restart: unless-stopped
-    networks:
-      - pdf-scanner-network
 
-  # You can add other services here (e.g., database, redis, monitoring)
-  # when needed for future enhancements
-
-networks:
-  pdf-scanner-network:
-    driver: bridge
-    name: pdf-scanner-net
-
-# Development environment notes:
-# 1. Make sure you have a .env file in the inspection-service directory
-# 2. The service will restart automatically when you change code files
-# 3. Logs are available via: docker-compose logs -f inspection-service
-# 4. To access the service: http://localhost:3001/health
-# 5. For production deployment, use docker-compose.prod.yml override 
+# Development notes:
+# 1. Create a .env file in the inspection-service directory for API keys
+# 2. The service will restart automatically when you change code files  
+# 3. Access the service at: http://localhost:3001/health
+# 4. Extension will connect to this service automatically 
