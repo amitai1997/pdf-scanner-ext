@@ -1,107 +1,114 @@
 # PDF Scanner Chrome Extension
 
-A Chrome extension that intercepts PDF uploads to AI services like ChatGPT and Claude to scan them for secrets before they reach the AI service.
+A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, Gemini, etc.) and scans them **before** they leave the browser, helping you catch sensitive data leaks early.
 
-## Features
+---
 
-- Immediate PDF scanning upon file selection
-- Detects sensitive information in PDFs before upload
-- Works with ChatGPT, Claude, and other AI services
-- Provides clear warnings when secrets are detected
-- Allows users to cancel uploads containing sensitive data
+## File Overview
 
-## Architecture
+### Extension (client‑side `src/`)
 
-The extension uses three complementary detection methods to ensure PDFs are caught before upload:
+* `content.js`  — Content script injected into pages to intercept `<input type="file">` and drag‑and‑drop PDF uploads before they leave the browser.
+* `background.js`  — Service‑worker context; coordinates scanning workflow, calls the local inspection service, and raises UI alerts.
+* `popup.html` / `src/popup.js`  — Minimal UI that shows scan results, warnings, and links to documentation.
+* `utils/logger.js`  — Lightweight logger shared by content and background scripts.
+* `utils/secretPatterns.js`  — Heuristic regexes for offline secret detection.
+* `utils/pdfParser.js`  — Extracts text from PDF blobs in the browser for quick, client‑side scanning.
 
-1. **File Input Monitoring (Primary Method)**
-   - Detects PDFs immediately when selected through file inputs
-   - Provides the best user experience with immediate feedback
-   - Works with standard file selection dialogs
+### Local inspection service (`inspection-service/`)
 
-2. **WebRequest API (Backup Method)**
-   - Catches uploads that bypass file inputs
-   - Monitors network requests to AI service endpoints
-   - Provides a safety net for non-standard uploads
+* `server.js`  — Express server that receives PDFs, extracts text with `pdfjs`, and forwards it to the Prompt Security API.
+* `promptSecurityClient.js`  — Thin wrapper around the third‑party Prompt Security REST API.
+* `errorHandler.js`  — Centralised Express error‑handling middleware.
+* `extractText.js`  — Node helper that converts PDF buffers to plain text for the scanning pipeline.
+* `Dockerfile`  — Builds the inspection‑service image.
+* `docker-compose.yml`  — Spins up the inspection service (and any side‑cars) in one command.
 
-3. **XHR/Fetch Overrides (Fallback Method)**
-   - Monitors programmatic uploads via JavaScript
-   - Intercepts XHR and fetch requests containing PDFs
-   - Ensures coverage for advanced web applications
+## *(Files not listed here are build/config artefacts or ancillary test data.)*
 
-This multi-layered approach ensures comprehensive coverage across different AI services and upload methods.
+---
 
-## Installation
+## General Architecture
 
-### For Users
-1. Clone this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the extension directory
-5. The extension is now installed and active
+![General Architecture](public/architecture.svg)
 
-### For Developers
-1. Clone this repository
-2. Install dependencies:
+---
+
+## Instructions for Local Use & Testing
+
+1. **Clone the repository**
+
    ```bash
-   npm ci
-   ```
-3. Copy environment configuration:
-   ```bash
-   cp .env.example .env
-   ```
-4. Start the development environment:
-   ```bash
-   npm run dev
+   git clone git@github.com:amitai1997/pdf-scanner-ext.git
+   cd pdf-scanner-ext
    ```
 
-## Development Setup
+2. **Load as an unpacked extension**
 
-The extension includes a mock backend for development:
+   * Open Chrome and navigate to `chrome://extensions`.
+   * Enable **Developer mode**.
+   * Click **Load unpacked** and select this repo's folder.
 
-1. The mock backend runs at `http://localhost:8080`
-2. It simulates the PDF scanning API
-3. PDFs with names containing "secret", "aws", "key", "pass", "token", or "auth" will be flagged as containing secrets
+3. **Run the Inspection Service with Docker Compose**
 
-For more detailed development instructions, see [DEVELOPMENT.md](DEVELOPMENT.md).
+   The repository includes a preconfigured `docker-compose.yml` in the root. To start the service, simply run:
 
-## Usage
+   ```bash
+   docker-compose up --build
+   ```
 
-1. When you select a PDF file to upload to an AI service, the extension will automatically scan it
-2. A scanning indicator will appear while the file is being analyzed
-3. If no secrets are found, a green indicator will confirm the file is safe to upload
-4. If secrets are detected, a warning modal will appear with details and options to proceed or cancel
+   * The inspection service will build and listen on port 3001 by default.
+   * You can stop it with `docker-compose down`.
 
-## Troubleshooting
+---
 
-### Common Issues
-- **Extension not detecting PDFs**: Make sure you're on a supported site (ChatGPT, Claude)
-- **Scanning indicator doesn't appear**: Reload the page and try again
-- **Warning appears but upload proceeds anyway**: Some sites use custom upload mechanisms that bypass standard prevention
+## Limitations
 
-### Development Issues
-- **Mock backend not connecting**: Check that port 8080 is not in use by another application
-- **Changes not appearing**: Reload the extension in Chrome's extension manager
-- **Console errors about imports**: Make sure you're using the correct import syntax for ES modules
+* **Heuristic-based detection** may yield false positives/negatives when offline.
+* **API-backed scanning** depends on service availability and network latency.
+* **Browser compatibility** tested on Chrome only; other Chromium browsers untested.
+* **Size Constraints**: Very large PDFs (>50 MB) may not fully scan before upload.
 
-## Security Notes
+---
 
-- The extension scans PDFs locally before they're uploaded
-- No data is sent to external servers (except for the AI service you're using)
-- Sensitive information is never logged or stored
+## Production Readiness Checklist
 
-## Production Deployment
+1. **Robust Secret Detection**
 
-Coming in Day 3 of development.
+   * Integrate with a dedicated secrets-scanning API (e.g., TruffleHog, GitLeaks).
+   * Maintain and update regex patterns and ML models.
 
-## License
+2. **Authentication & Security**
 
-MIT
+   * Secure API endpoints with OAuth2 or API keys.
+   * Serve the API over HTTPS with valid TLS certificates.
 
-## Privacy Policy
+3. **Error Handling & Logging**
 
-This extension does not collect any user data. All PDF scanning is done locally or through the specified API endpoint.
+   * Centralized logging (e.g., ELK stack, Datadog).
+   * Graceful fallback: allow upload if the scanner service is unavailable.
 
-## Support
+4. **User Experience**
 
-For issues or feature requests, please open an issue on the GitHub repository.
+   * Customizable alert UI.
+   * Option to whitelist certain file paths or patterns.
+
+5. **CI/CD & Deployment**
+
+   * Automated builds and tests via GitHub Actions.
+   * Versioning and release pipeline for Chrome Web Store.
+
+6. **Documentation & Support**
+
+   * Detailed user guide.
+   * Changelog and troubleshooting section.
+
+---
+
+## Performance Improvement Ideas
+
+* **WebAssembly (WASM) scanning**: Run detection logic in-thread in the browser for speed.
+* **Incremental PDF parsing**: Stream and scan in chunks for large files.
+* **Caching previously scanned documents**: Use localStorage or IndexedDB to skip re-scanning.
+* **Parallelized scanning**: Leverage Web Workers to scan different PDF sections concurrently.
+* **Batch uploads queue**: Throttle and batch multiple uploads to reduce UI blocking.
