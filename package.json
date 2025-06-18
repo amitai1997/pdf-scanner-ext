@@ -10,10 +10,18 @@
     "format": "prettier --write src/**/*.js public/**/*.{html,css}",
     "dev:extension": "web-ext run --source-dir . --target chromium",
     "dev": "npm run dev:extension",
+    "dev:service": "cd inspection-service && npm run dev",
+    "dev:docker": "docker-compose up",
     "build": "web-ext build --source-dir . --artifacts-dir dist",
+    "build:docker": "cd inspection-service && docker build -t pdf-scanner-inspection:latest --target production .",
     "test": "echo \"No tests configured\"",
+    "test:service": "cd inspection-service && npm test",
     "validate": "web-ext lint --source-dir .",
-    "clean": "rm -rf dist/ web-ext-artifacts/"
+    "package": "./scripts/package-release.sh",
+    "clean": "rm -rf dist/ web-ext-artifacts/ release/ temp-release/",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f inspection-service"
   },
   "keywords": [
     "chrome-extension",
