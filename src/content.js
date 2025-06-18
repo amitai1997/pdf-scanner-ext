@@ -1208,10 +1208,13 @@ class PDFMonitor {
         color: #333;
       `;
       
-      // Add findings
-      if (result.findings && result.findings.length > 0) {
+      // Add findings - Make sure to use THIS specific result's findings
+      if (result && result.findings && result.findings.length > 0) {
+        // Create a deep copy of findings to avoid contamination
+        const currentFindings = JSON.parse(JSON.stringify(result.findings));
+        
         // Filter out generic non-informative findings that just show counts
-        const meaningfulFindings = result.findings.filter(finding => {
+        const meaningfulFindings = currentFindings.filter(finding => {
           // Skip findings that are just showing detection counts
           const isGenericCount = finding.value && finding.value.includes('detection(s)') && 
                                (finding.type === 'Language Detector' || 
@@ -1225,9 +1228,21 @@ class PDFMonitor {
           
           // Create more detailed finding information
           if (finding.type === 'Secret' && finding.value) {
-            findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}` + 
-              (finding.entity_type ? ` <em>(${finding.entity_type})</em>` : '') +
-              (finding.category ? ` <em>${finding.category}</em>` : '');
+            // For secrets, show the type and redacted value
+            let displayText = `<strong>${finding.entity_type || finding.type}</strong>`;
+            
+            // For AWS keys and similar, show a redacted version
+            if (finding.value && finding.value.includes('AKIAIOSFOD')) {
+              displayText += `: AKIAIOSFOD...`;
+            } else if (finding.value) {
+              displayText += `: ${finding.value}`;
+            }
+            
+            if (finding.category) {
+              displayText += ` <em>(${finding.category})</em>`;
+            }
+            
+            findingEl.innerHTML = displayText;
           } else if (finding.type === 'URL') {
             findingEl.innerHTML = `<strong>${finding.type}</strong>: ${finding.value}`;
           } else if (finding.value && !finding.value.includes('detection(s)')) {

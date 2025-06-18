@@ -85,15 +85,12 @@ class PDFScannerBackground {
     logger.log(`Using backend URL: ${this.BACKEND_URL}`);
     
     this.processedRequestIds = new Set();
+    this.processedFileHashes = new Set();
     this.scansInFlight       = new Map();
 
-    // Clean up request IDs periodically to prevent memory leaks
-    chrome.alarms.create('clearRequestIds', { periodInMinutes: 60 });
+    chrome.alarms.create('clearHashCache', { periodInMinutes: 24 * 60 });
     chrome.alarms.onAlarm.addListener(a => {
-      if (a.name === 'clearRequestIds') {
-        logger.log('Clearing processed request IDs cache');
-        this.processedRequestIds.clear();
-      }
+      if (a.name === 'clearHashCache') this.processedFileHashes.clear();
     });
     
     this.init();
@@ -447,6 +444,14 @@ class PDFScannerBackground {
         logger.warn('[PDF Scanner] Skipping 0‑byte upload:', filename);
         return;               // do not hash, do not scan
       }
+      const fileHash = await this._computeHash(fileData);
+      logger.log(`Scanning file: ${filename}, hash: ${fileHash}, base64 length: ${fileData.length}`);
+      if (fileSize === 0 && this.processedFileHashes.has(fileHash)) {
+        // We use the cache **only** to suppress the duplicate empty payload
+        logger.log('Duplicate empty upload skipped for hash:', fileHash);
+        return;
+      }
+      this.processedFileHashes.add(fileHash);
       
       logger.log(`Intercepted PDF: ${filename} (${fileSize} bytes), ID: ${requestId}`);
       
@@ -470,8 +475,7 @@ class PDFScannerBackground {
       const result = await this.scanPDF({
         fileData,
         filename,
-        fileSize,
-        uniqueId: `${requestId}_${Date.now()}` // Add unique ID to ensure independent scans
+        fileSize
       });
       
       // Update queue status
@@ -515,22 +519,16 @@ class PDFScannerBackground {
   }
 
   async scanPDF(message) {
-    const { fileData, filename, fileSize, uniqueId } = message;
-    
-    // Create a truly unique scan key using multiple factors
-    const scanKey = uniqueId || `${filename}_${Date.now()}_${fileSize}_${Math.random()}`;
-    
-    // Check if we already have this exact scan in flight (prevents duplicate concurrent scans)
-    if (this.scansInFlight.has(scanKey)) {
-      logger.log('Scan already in flight, awaiting result for key:', scanKey);
-      return await this.scansInFlight.get(scanKey);
+    const { fileData, filename, fileSize } = message;
+    // ── single‑shot execution guard ──
+    if (this.scansInFlight.has(filename)) {
+      logger.log('Scan already in flight, awaiting result for:', filename);
+      return await this.scansInFlight.get(filename);
     }
 
     let _resolveScan, _rejectScan;
     const scanPromise = new Promise((res, rej) => { _resolveScan = res; _rejectScan = rej; });
-    this.scansInFlight.set(scanKey, scanPromise);
-    
-    logger.log(`Starting new scan for: ${filename} (key: ${scanKey})`);
+    this.scansInFlight.set(filename, scanPromise);
 
     try {
       // Convert data to blob based on format
@@ -602,9 +600,7 @@ class PDFScannerBackground {
       throw new Error(`Failed to scan PDF: ${error.message}`);
     }
     finally {
-      // Always clean up the scan from the in-flight map
-      this.scansInFlight.delete(scanKey);
-      logger.log(`Scan completed and removed from in-flight for key: ${scanKey}`);
+      this.scansInFlight.delete(filename);
     }
   }
 
