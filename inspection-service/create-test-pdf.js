@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/**
+ * Test PDF Generator - Creates PDFs with various secret patterns for testing
+ * Usage: node create-test-pdf.js
+ */
 
 const fs = require('fs');
 

@@ -46,27 +46,20 @@ async function extractPDFTextDeterministic(buffer, filename) {
   const bufferHash = crypto.createHash('sha256').update(buffer).digest('hex');
   const cacheKey = `${filename}_${bufferHash}_${buffer.length}`;
   
-  console.log(`=== PDF PARSING REQUEST for ${filename} ===`);
-  console.log(`Cache key: ${cacheKey.substring(0, 50)}...`);
-  console.log(`Current cache size: ${pdfParseCache.size}`);
-  console.log(`Active parsing promises: ${pdfParsePromises.size}`);
+  console.log(`📄 PDF parsing request: ${filename}`);
   
   // Check cache first
   if (pdfParseCache.has(cacheKey)) {
     const cached = pdfParseCache.get(cacheKey);
-    console.log(`✅ Using cached PDF parse result for ${filename}: ${cached.text.length} characters`);
+    console.log(`📋 Using cached result for ${filename}`);
     return cached;
   }
   
-  // Check if there's already a parsing operation in progress for this file
-  if (pdfParsePromises.has(cacheKey)) {
-    console.log(`⏳ Waiting for ongoing PDF parse for ${filename}`);
-    const result = await pdfParsePromises.get(cacheKey);
-    console.log(`✅ Received result from ongoing parse for ${filename}: ${result.text.length} characters`);
-    return result;
-  }
-  
-  console.log(`🆕 Starting new PDF parsing operation for ${filename}`);
+      // Check if there's already a parsing operation in progress for this file
+    if (pdfParsePromises.has(cacheKey)) {
+      console.log(`⏳ Waiting for ongoing parse: ${filename}`);
+      return await pdfParsePromises.get(cacheKey);
+    }
   
   // Create and immediately store the promise before starting any async work
   let resolveParsePromise, rejectParsePromise;
@@ -84,7 +77,6 @@ async function extractPDFTextDeterministic(buffer, filename) {
     
     // Strategy 1: Try standard PDF parsing
     try {
-      console.log(`PDF parse attempt for ${filename}`);
       const standardResult = await pdfParse(buffer);
       if (standardResult && standardResult.text && standardResult.text.trim().length > 0) {
         result = {
@@ -92,10 +84,10 @@ async function extractPDFTextDeterministic(buffer, filename) {
           info: standardResult.info,
           numpages: standardResult.numpages
         };
-        console.log(`Successfully extracted ${result.text.length} characters (standard parsing)`);
+        console.log(`✅ Standard PDF parsing: ${result.text.length} chars`);
       }
     } catch (error) {
-      console.log(`Standard PDF parsing failed: ${error.message}`);
+              console.log(`⚠️  Standard parsing failed: ${error.message}`);
     }
     
     // Strategy 2: Try alternative parsing if standard failed
@@ -108,10 +100,10 @@ async function extractPDFTextDeterministic(buffer, filename) {
             info: altResult.info,
             numpages: altResult.numpages
           };
-          console.log(`Successfully extracted ${result.text.length} characters (alternative parsing)`);
+          console.log(`✅ Alternative parsing: ${result.text.length} chars`);
         }
       } catch (error) {
-        console.log(`Alternative PDF parsing failed: ${error.message}`);
+        console.log(`⚠️  Alternative parsing failed: ${error.message}`);
       }
     }
     
@@ -133,7 +125,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         const streamMatches = binaryString.match(streamPattern);
         
         if (streamMatches) {
-          console.log(`📦 Found ${streamMatches.length} stream objects, attempting decompression...`);
+          console.log(`📦 Processing ${streamMatches.length} stream objects...`);
           
           for (const streamMatch of streamMatches) {
             try {
@@ -142,26 +134,22 @@ async function extractPDFTextDeterministic(buffer, filename) {
               
               // Handle ASCII85 + FlateDecode sequence
               if (streamData.includes('~>')) {
-                console.log('🔍 Found ASCII85 encoded stream, attempting proper decode sequence...');
+                console.log('🔍 ASCII85 + FlateDecode stream detected...');
                 
                 try {
                   // Extract ASCII85 content (everything before '~>')
                   const ascii85Data = streamData.substring(0, streamData.indexOf('~>'));
-                  console.log(`🔧 Decoding ASCII85 data (${ascii85Data.length} chars)...`);
                   
-                  // Decode ASCII85 first
+                  // Decode ASCII85 first, then decompress with FlateDecode (zlib)
                   const decoded = ascii85.decode(ascii85Data);
-                  console.log(`✅ ASCII85 decoded: ${decoded.length} bytes`);
-                  
-                  // Then decompress with FlateDecode (zlib)
                   const decompressed = zlib.inflateSync(decoded);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  console.log(`🎉 SUCCESSFULLY DECODED ASCII85+FlateDecode: "${decompressedText}"`);
+                  console.log(`✅ Decoded content: "${decompressedText}"`);
                   
                   // Check if this contains our AWS key
                   if (decompressedText.includes('AKIA')) {
-                    console.log(`🔑 FOUND AWS KEY IN DECODED CONTENT!`);
+                    console.log(`🔑 AWS key found in decoded content!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
                   } else {
@@ -184,12 +172,11 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   const decompressed = zlib.inflateSync(streamBytes);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  console.log(`📄 Successfully decompressed FlateDecode: ${decompressedText.length} characters`);
-                  console.log(`📄 Content: "${decompressedText}"`);
+                  console.log(`✅ FlateDecode: "${decompressedText}"`);
                   
                   // Check if this contains our AWS key
                   if (decompressedText.includes('AKIA')) {
-                    console.log(`🔑 FOUND AWS KEY IN DECODED CONTENT!`);
+                    console.log(`🔑 AWS key found!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
                   } else {
@@ -240,15 +227,13 @@ async function extractPDFTextDeterministic(buffer, filename) {
       // PRIORITIZE actual secrets over metadata
       if (awsKeys.length > 0) {
         extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
-        console.log(`🔑 Found AWS keys in binary data: ${awsKeys.join(', ')}`);
-        console.log(`✅ Prioritizing AWS keys over other content`);
+        console.log(`🔑 AWS keys found: ${awsKeys.join(', ')}`);
       } else if (secrets.length > 0) {
         // Filter out short matches and PDF noise
         const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
         if (realSecrets.length > 0) {
           extractedText = realSecrets.join(' '); // Use ONLY the secrets
-          console.log(`🔑 Found potential secrets in binary data: ${realSecrets.length} matches`);
-          console.log(`✅ Prioritizing secrets over metadata`);
+          console.log(`🔑 Potential secrets found: ${realSecrets.length} matches`);
         }
       } else if (compressedSecrets.length > 0) {
         // Only use compressed secrets if no direct secrets found
@@ -262,8 +247,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         
         if (filteredSecrets.length > 0) {
           extractedText = filteredSecrets.slice(0, 5).join(' '); // Take top 5
-          console.log(`🗜️  Found potential secrets in compressed streams: ${filteredSecrets.length} matches`);
-          console.log(`🗜️  Top matches: ${filteredSecrets.slice(0, 3).join(', ')}`);
+          console.log(`🗜️  Compressed secrets found: ${filteredSecrets.length} matches`);
         }
       }
       
@@ -284,7 +268,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
         
         if (actualContent.length > 0) {
           extractedText += ' ' + actualContent.join(' ');
-          console.log(`📄 Found readable content: ${actualContent.length} text blocks`);
+          console.log(`📄 Readable content: ${actualContent.length} blocks`);
         }
         
         // 3. Last resort: extract longer alphanumeric sequences (but skip PDF noise)
@@ -300,16 +284,12 @@ async function extractPDFTextDeterministic(buffer, filename) {
           
           if (alphaMatches.length > 0) {
             extractedText += ' ' + alphaMatches.join(' ');
-            console.log(`🔤 Found alphanumeric sequences: ${alphaMatches.length} matches`);
+            console.log(`🔤 Alphanumeric sequences: ${alphaMatches.length} matches`);
           }
         }
-      } else {
-        console.log(`✅ Already found secrets, skipping additional content extraction`);
       }
       
-      // Debug: show what we actually extracted
-      console.log(`🔍 Total extracted text length: ${extractedText.length}`);
-      console.log(`🔍 Extracted preview: ${extractedText.substring(0, 200)}...`);
+      console.log(`🔍 Extracted ${extractedText.length} chars: ${extractedText.substring(0, 100)}...`);
       
       // Clean up the extracted text
       extractedText = extractedText.replace(/\s+/g, ' ').trim();
@@ -345,7 +325,6 @@ async function extractPDFTextDeterministic(buffer, filename) {
     
     // Cache the successful result
     pdfParseCache.set(cacheKey, result);
-    console.log(`💾 Cached parsing result for ${filename}: ${result.text.length} characters`);
     
     // Limit cache size to prevent memory issues
     if (pdfParseCache.size > 100) {
@@ -377,22 +356,16 @@ async function extractPDFTextDeterministic(buffer, filename) {
   } finally {
     // Always clean up the promise cache
     pdfParsePromises.delete(cacheKey);
-    console.log(`🧹 Cleaned up parsing promise for ${filename}`);
   }
 }
 
-/** Enhanced secret detection patterns for various secret types */
+/** Local secret detection patterns (fallback when API unavailable) */
 const secretPatterns = [
   // AWS keys (specific)
   { pattern: /AKIA[0-9A-Z]{16}/g,                                   name: 'AWS Access Key ID' },
   { pattern: /[0-9a-zA-Z/+]{40}/g,                                  name: 'AWS Secret Access Key' },
   
-  // Hex patterns (but will filter out pure lowercase in noise filter)
-  { pattern: /[0-9a-fA-F]{32}/g,                                   name: 'Hex Hash (32-char)' },
-  { pattern: /[0-9a-fA-F]{40}/g,                                   name: 'Hex Hash (40-char)' },  
-  { pattern: /[0-9a-fA-F]{64}/g,                                   name: 'Hex Hash (64-char)' },
-  
-  // Base64-like patterns with mixed case (more likely secrets)
+  // Base64-like patterns
   { pattern: /[A-Za-z0-9+/]{16,}={0,2}/g,                          name: 'Base64 Encoded Secret' },
   { pattern: /[A-Za-z0-9_-]{15,25}/g,                              name: 'URL-Safe Token' },
   
@@ -401,20 +374,14 @@ const secretPatterns = [
   { pattern: /(bearer|auth|authorization)[=:]["']?([\w.-]+)/gi,    name: 'Auth Token' },
   
   // PEM blocks
-  { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' },
-  
-  // UUID-ish strings
-  { pattern: /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-    name: 'UUID / Possible Token' }
+  { pattern: /-----BEGIN( RSA)? PRIVATE KEY-----/g,                 name: 'Private Key' }
 ];
 
 /**
  * Perform a local regex scan (used when the upstream API is unavailable).
  */
 function performLocalScan (text, filename) {
-  console.log(`🔍 Starting local regex scan for ${filename}`);
-  console.log(`Text length: ${text.length} characters`);
-  console.log(`Text preview (first 100 chars): ${text.substring(0, 100)}`);
+  console.log(`🔍 Local regex scan: ${text.length} chars`);
   
   const findings = [];
   const foundSecrets = new Set(); // Track unique secrets to avoid duplicates
@@ -435,12 +402,8 @@ function performLocalScan (text, filename) {
     'Private Key': 9,
     'Generic API Key': 8,
     'Auth Token': 7,
-    'Hex Hash (32-char)': 6,
-    'Hex Hash (40-char)': 6,
-    'Hex Hash (64-char)': 6,
     'Base64 Encoded Secret': 3,
-    'URL-Safe Token': 2,
-    'UUID / Possible Token': 1
+    'URL-Safe Token': 2
   };
   
   // Function to check if a hex string is likely a PDF internal hash
@@ -475,10 +438,9 @@ function performLocalScan (text, filename) {
       });
       
       if (realMatches.length > 0) {
-        console.log(`🚨 Found ${realMatches.length} matches for pattern ${p.name}`);
+        console.log(`🚨 Found ${realMatches.length} matches: ${p.name}`);
         for (const m of realMatches) {
           const secretValue = m[0];
-          console.log(`  - Match: ${secretValue}`);
           
           // Check if this exact secret was already found with a higher priority pattern
           const existingFinding = findings.find(f => f.fullValue === secretValue);
@@ -490,9 +452,6 @@ function performLocalScan (text, filename) {
             // Only replace if current pattern has higher priority
             if (currentPriority > existingPriority) {
               existingFinding.type = p.name;
-              console.log(`  ↗️ Updated ${secretValue} to higher priority type: ${p.name}`);
-            } else {
-              console.log(`  ⏭️ Skipping ${secretValue} - already found with higher priority: ${existingFinding.type}`);
             }
           } else {
             // New secret, add it
@@ -505,11 +464,7 @@ function performLocalScan (text, filename) {
             foundSecrets.add(secretValue);
           }
         }
-      } else {
-        console.log(`✓ No matches for pattern ${p.name} (filtered PDF noise)`);
       }
-    } else {
-      console.log(`✓ No matches for pattern ${p.name}`);
     }
   }
   
