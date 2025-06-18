@@ -48,25 +48,30 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
    * Enable **Developer mode**.
    * Click **Load unpacked** and select this repo's folder.
 
-3. **Run the Inspection Service with Docker Compose**
+3. **Configure the Inspection Service**
 
-   The repository includes a preconfigured `docker-compose.yml` in the root. To start the service, simply run:
+   Copy the environment template and configure your API credentials:
 
    ```bash
+   cd inspection-service
+   cp env.template .env
+   ```
+
+   * Edit `.env` and set your `PROMPT_SECURITY_APP_ID` (required for secret detection)
+   * The template includes a test app ID for development purposes
+
+4. **Run the Inspection Service with Docker Compose**
+
+   Return to the root directory and start the service:
+
+   ```bash
+   cd ..
    docker-compose up --build
    ```
 
    * The inspection service will build and listen on port 3001 by default.
    * You can stop it with `docker-compose down`.
 
----
-
-## ⚠️ API Dependency Notice
-
-This extension requires the Prompt Security API for secret detection. If the API is unavailable:
-- PDFs will be **allowed** through with a warning log
-- No local/offline scanning is performed
-- Restore API connectivity for full protection
 
 ---
 
