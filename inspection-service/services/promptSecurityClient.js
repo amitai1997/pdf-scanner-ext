@@ -95,13 +95,14 @@ class PromptSecurityClient {
       }
     }
 
-    // If we get here, all attempts failed
-    logger.error('API calls failed, falling back to local scanning');
+    // If we get here, all attempts failed - gracefully allow
+    logger.warn('Prompt Security API unavailable - allowing upload');
     return {
       secrets: false,
       findings: [],
       action: 'allow',
       scannedAt: new Date().toISOString(),
+      note: 'API unavailable - upload permitted',
       error: `API unavailable: ${lastError?.message}`
     };
   }

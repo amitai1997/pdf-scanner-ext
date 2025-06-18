@@ -8,21 +8,21 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
 
 ### Extension (client‑side `src/`)
 
-* `content.js`  — Content script injected into pages to intercept `<input type="file">` and drag‑and‑drop PDF uploads before they leave the browser.
-* `background.js`  — Service‑worker context; coordinates scanning workflow, calls the local inspection service, and raises UI alerts.
-* `popup.html` / `src/popup.js`  — Minimal UI that shows scan results, warnings, and links to documentation.
-* `utils/logger.js`  — Lightweight logger shared by content and background scripts.
-* `utils/secretPatterns.js`  — Heuristic regexes for offline secret detection.
-* `utils/pdfParser.js`  — Extracts text from PDF blobs in the browser for quick, client‑side scanning.
+* `content.js`  — Content script injected into pages to intercept `<input type="file">` and drag‑and‑drop PDF uploads before they leave the browser.
+* `background.js`  — Service‑worker context; coordinates scanning workflow, calls the local inspection service, and raises UI alerts.
+* `popup.html` / `src/popup.js`  — Minimal UI that shows scan results, warnings, and links to documentation.
+* `utils/logger.js`  — Lightweight logger shared by content and background scripts.
+* ~~`utils/secretPatterns.js`~~ — **Removed**: Now uses Prompt Security API exclusively
+* ~~`utils/pdfParser.js`~~ — **Not implemented**: Server-side parsing only
 
 ### Local inspection service (`inspection-service/`)
 
-* `server.js`  — Express server that receives PDFs, extracts text with `pdfjs`, and forwards it to the Prompt Security API.
-* `promptSecurityClient.js`  — Thin wrapper around the third‑party Prompt Security REST API.
-* `errorHandler.js`  — Centralised Express error‑handling middleware.
-* `extractText.js`  — Node helper that converts PDF buffers to plain text for the scanning pipeline.
-* `Dockerfile`  — Builds the inspection‑service image.
-* `docker-compose.yml`  — Spins up the inspection service (and any side‑cars) in one command.
+* `server.js`  — Express server that receives PDFs, extracts text with `pdfjs`, and forwards it to the Prompt Security API.
+* `promptSecurityClient.js`  — Thin wrapper around the third‑party Prompt Security REST API.
+* `errorHandler.js`  — Centralised Express error‑handling middleware.
+* `extractText.js`  — Node helper that converts PDF buffers to plain text for the scanning pipeline.
+* `Dockerfile`  — Builds the inspection‑service image.
+* `docker-compose.yml`  — Spins up the inspection service (and any side‑cars) in one command.
 
 ## *(Files not listed here are build/config artefacts or ancillary test data.)*
 
@@ -62,12 +62,21 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
 
 ---
 
+## ⚠️ API Dependency Notice
+
+This extension requires the Prompt Security API for secret detection. If the API is unavailable:
+- PDFs will be **allowed** through with a warning log
+- No local/offline scanning is performed
+- Restore API connectivity for full protection
+
+---
+
 ## Limitations
 
-* **Heuristic-based detection** may yield false positives/negatives when offline.
-* **API-backed scanning** depends on service availability and network latency.
+* **API dependency**: Requires Prompt Security API for secret detection; gracefully allows uploads when API is unavailable.
+* **Network latency**: API-backed scanning depends on service availability and network connectivity.
 * **Browser compatibility** tested on Chrome only; other Chromium browsers untested.
-* **Size Constraints**: Very large PDFs (>50 MB) may not fully scan before upload.
+* **Size Constraints**: Very large PDFs (>50 MB) may not fully scan before upload.
 
 ---
 
