@@ -17,6 +17,7 @@
   "license": "ISC",
   "description": "Backend service for PDF Security Scanner extension that extracts text from PDFs and scans for secrets",
   "dependencies": {
+    "ascii85": "^1.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.18.2",

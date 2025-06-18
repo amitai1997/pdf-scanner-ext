@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+How Claude talks to your sources.
+	1.	Servers: filesystem, git, firecrawl, notion—least scopes only.
+	2.	Use open / click / find verbs to fetch content; cite returned IDs.
+	3.	Prefer internal docs before Firecrawl; never paste secrets in prompts.
+	4.	Re-index weekly; refresh tokens on 401s.
+	5.	Log key Claude insights back to Notion.

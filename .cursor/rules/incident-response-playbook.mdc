@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	1.	Detect & triage in #incidents; assign IC <15 min.
+	2.	Contain: rollback, revoke keys, unpublish extension.
+	3.	Eradicate root cause; patch in hotfix/, add test.
+	4.	Recover: deploy fix, verify dashboards, ramp flags.
+	5.	Comms: hourly Slack; customer notice if data/outage.
+	6.	Post-mortem ≤ 48 h → actions, doc updates, MTTR metrics.

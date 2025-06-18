@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	•	CI green; branch rebased.
+	•	Single-purpose PR with clear description.
+	•	Tests cover new code; no lint errors.
+	•	No hard-coded secrets or new risky perms.
+	•	Docs updated; Conventional Commit message.

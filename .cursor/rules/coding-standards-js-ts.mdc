@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Code that’s easy to review and safe to ship.
+	•	Format: Prettier (100 cols, trailing commas).
+	•	Lint: ESLint + @typescript-eslint + security.
+	•	Types: TS strict: true; JS requires JSDoc.
+	•	Tests: Jest; coverage ≥ 85 %.
+	•	Errors: custom Error; no console.log.
+	•	Security: no eval; validate input (zod).
+	•	Deps: locked versions, npm audit gate.
+	•	Commits: Conventional Commits; hooks run lint+scan.

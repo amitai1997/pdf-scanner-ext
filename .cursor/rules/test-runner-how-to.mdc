@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	1.	Jest (+Testing Library); Playwright optional.
+	2.	Tests near code, suffix .test.ts.
+	3.	Scripts: test, test:watch, test:cov.
+	4.	Mock chrome.* with jest-chrome; HTTP with msw.
+	5.	CI fails if coverage < 85 %.
+	6.	Keep snapshots small; upload Playwright traces on fail.
