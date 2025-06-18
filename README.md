@@ -2,43 +2,18 @@
 
 A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, Gemini, etc.) and scans them **before** they leave the browser, helping you catch sensitive data leaks early.
 
----
-
-## File Overview
-
-### Extension (client‑side `src/`)
-
-* `content.js`  — Content script injected into pages to intercept `<input type="file">` and drag‑and‑drop PDF uploads before they leave the browser.
-* `background.js`  — Service‑worker context; coordinates scanning workflow, calls the local inspection service, and raises UI alerts.
-* `popup.html` / `src/popup.js`  — Minimal UI that shows scan results, warnings, and links to documentation.
-* `utils/logger.js`  — Lightweight logger shared by content and background scripts.
-
-
-### Local inspection service (`inspection-service/`)
-
-* `server.js`  — Express server that receives PDFs, extracts text with `pdfjs`, and forwards it to the Prompt Security API.
-* `promptSecurityClient.js`  — Thin wrapper around the third‑party Prompt Security REST API.
-* `errorHandler.js`  — Centralised Express error‑handling middleware.
-* `extractText.js`  — Node helper that converts PDF buffers to plain text for the scanning pipeline.
-* `Dockerfile`  — Builds the inspection‑service image.
-* `docker-compose.yml`  — Spins up the inspection service (and any side‑cars) in one command.
-
-## *(Files not listed here are build/config artefacts or ancillary test data.)*
-
----
-
 ## General Architecture
 
 ![General Architecture](public/architecture.svg)
-
 ---
+
 
 ## Instructions for Local Use & Testing
 
 1. **Clone the repository**
 
    ```bash
-   git clone git@github.com:amitai1997/pdf-scanner-ext.git
+   git clone https://github.com/amitai1997/pdf-scanner-ext.git
    cd pdf-scanner-ext
    ```
 
@@ -72,7 +47,33 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
    * The inspection service will build and listen on port 3001 by default.
    * You can stop it with `docker-compose down`.
 
+5. *Now you can open Chatgpt/Claude and upload PDF files to test this manually!*
 
+---
+
+## File Overview
+
+### 1. inspection-service (Node + Express micro-service `inspection-service/`)
+
+| File                               | What it does                                                                                                                                                     |
+|------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **server.js**                      | Spins up the Express API (`/health`, `/scan`). Accepts a PDF, extracts text deterministically with `extractPDFTextDeterministic()`, sends it to Prompt Security, and returns an **allow/block** verdict. |
+| **middleware/errorHandler.js**     | Central error middleware + tiny `AppError` class so all routes respond with a consistent JSON envelope and status code.                                            |
+| **services/promptSecurityClient.js** | Thin client for the Prompt Security REST API – adds retries/back-off, request timeouts, and maps the raw response into `{secrets, findings, action}`.            |
+| **utils/logger.js**                | Colour-free console logger with `error / warn / info / debug` levels, request tracing helpers, and env-driven log level.                                          |
+
+### 2. Chrome Extension (`src/`)
+
+| File                            | Runtime context    | What it does                                                                                                                                               |
+|---------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **background.js**               | Service-worker     | Orchestrates scans: receives PDFs, POSTs them to the backend, stores daily counters in `chrome.storage`, throttles duplicate scans, and shows desktop + in-page notifications. |
+| **content.js**                  | Content script     | Watches  P the page for file uploads, drag-drops, clipboard pastes, XHR/`fetch` bodies; flags PDFs, requests scans, and overlays a warning banner if secrets are found. |
+| **popup.js**                    | Popup UI           | Controller for `popup.html`; shows Active/Inactive state, daily scan count, last-scan time, and a DEV badge for non-production builds.                    |
+| **utils/formDataParser.js**     | Shared (SW + content + interceptor) | Extracts a PDF from any request body (multipart, base64 JSON blob, nested `file` object) and enforces the 20 MB limit.                       |
+| **utils/interceptor.js**        | Shared, initialised by the service-worker |  PAdds Chrome `webRequest` listeners for AI-site endpoints. When it sees an outgoing POST containing a PDF, it extracts the file (via `FormDataParser`) and passes it to the service-worker. |
+
+---
+![General Architecture](public/sequence_diagram.png)
 ---
 
 ## Limitations
