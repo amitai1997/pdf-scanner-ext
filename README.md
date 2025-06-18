@@ -12,8 +12,7 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
 * `background.js`  — Service‑worker context; coordinates scanning workflow, calls the local inspection service, and raises UI alerts.
 * `popup.html` / `src/popup.js`  — Minimal UI that shows scan results, warnings, and links to documentation.
 * `utils/logger.js`  — Lightweight logger shared by content and background scripts.
-* ~~`utils/secretPatterns.js`~~ — **Removed**: Now uses Prompt Security API exclusively
-* ~~`utils/pdfParser.js`~~ — **Not implemented**: Server-side parsing only
+
 
 ### Local inspection service (`inspection-service/`)
 
