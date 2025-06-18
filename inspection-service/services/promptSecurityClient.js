@@ -170,15 +170,38 @@ class PromptSecurityClient {
         });
       }
 
-      // Check for violations in result
-      if (result.violations && Array.isArray(result.violations) && result.violations.includes('Secrets')) {
+      // Check for violations in result - ONLY treat actual secrets as dangerous
+      let hasSecrets = findings.some(f => f.type === 'Secret');
+      
+      // Violations are in result.prompt.violations, not result.violations
+      const violations = result.prompt?.violations || result.violations || [];
+      
+      console.log(`Checking violations - hasSecrets: ${hasSecrets}, action: ${action}`);
+      console.log(`Violations found:`, violations);
+      
+      // Check for explicit secret violations ONLY
+      if (violations && Array.isArray(violations) && violations.includes('Secrets')) {
         console.log('Secret violations detected in result');
+        hasSecrets = true;
+      }
+      
+      // Only block if we actually found secrets, not for prompt injection or other violations
+      if (hasSecrets) {
+        console.log('Blocking content due to actual secrets found');
+      } else if (action === 'block') {
+        console.log('API wants to block content, but no secrets found - allowing through');
+        console.log('Non-secret violations:', violations || 'policy violations');
+        
+        // Log the violations but don't treat as secrets
+        if (violations && violations.length > 0) {
+          console.log('Non-blocking violations detected:', violations.join(', '));
+        }
       }
 
       return {
-        secrets: findings.some(f => f.type === 'Secret'),
+        secrets: hasSecrets, // ONLY flag actual secrets, not prompt injection
         findings,
-        action,
+        action: hasSecrets ? 'block' : 'allow', // Override action based on actual secrets
         scannedAt: new Date().toISOString(),
         apiVersion: result.version || '1.0'
       };

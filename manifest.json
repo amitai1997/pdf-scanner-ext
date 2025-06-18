@@ -2,8 +2,7 @@
   "manifest_version": 3,
   "name": "PDF Scanner (Alpha)",
   "description": "Scans selected PDFs for secrets and policy violations via Prompt Security API.",
-  "version": "0.2.0",
-  "version_name": "Development Build",
+  "version": "0.3.0",
 
   "action": {
     "default_title": "Scan PDF",
@@ -16,20 +15,17 @@
 
   "permissions": [
     "storage",
-    "downloads",
-    "webRequest",
     "notifications",
     "alarms"
   ],
 
   "host_permissions": [
+    "http://localhost:3001/*",
     "https://eu.prompt.security/*",
     "https://*.chatgpt.com/*",
     "https://*.openai.com/*",
     "https://*.claude.ai/*",
-    "https://*.anthropic.com/*",
-    "http://localhost:8080/*",
-    "http://localhost:3001/*"
+    "https://*.anthropic.com/*"
   ],
 
   "content_security_policy": {
@@ -56,16 +52,12 @@
         "public/assets/*"
       ],
       "matches": [
-        "https://eu.prompt.security/*", 
-        "https://*.chatgpt.com/*", 
-        "https://*.openai.com/*", 
+        "https://eu.prompt.security/*",
+        "https://*.chatgpt.com/*",
+        "https://*.openai.com/*",
         "https://*.claude.ai/*",
         "https://*.anthropic.com/*"
       ]
-    },
-    {
-      "resources": ["icons/icon.png"],
-      "matches": ["<all_urls>"]
     }
   ],
 

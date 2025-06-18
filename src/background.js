@@ -53,84 +53,34 @@ logger.log('PDF Scanner service worker loaded');
 
 class PDFScannerBackground {
   constructor() {
-    // Environment detection
-    this.isDevelopment = !chrome.runtime.id || 
-                         chrome.runtime.id.includes('development') || 
-                         chrome.runtime.getManifest().version.includes('0.');
-    
-    // URLs based on environment
-    this.BACKEND_URL = this.isDevelopment 
-      ? 'http://localhost:3001' 
-      : 'https://api.your-production-backend.com';
-    
-    this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'; // From assignment
-    this.API_URL = 'https://eu.prompt.security/api/protect';
-    
-    // In-memory queue for PDF scan requests
+    // Configuration for local backend service
+    this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4';
+    this.API_URL = 'http://localhost:3001/scan';
     this.scanQueue = new Map();
-    
-    // Debug mode for additional logging
-    this.debugMode = this.isDevelopment;
-    
-    // Scan statistics
     this.scanStats = {
       scanCount: 0,
       lastScan: null,
       isActive: true,
       scanHistory: []
     };
-    
-    // Log environment
-    logger.log(`Running in ${this.isDevelopment ? 'DEVELOPMENT' : 'PRODUCTION'} mode`);
-    logger.log(`Using backend URL: ${this.BACKEND_URL}`);
-    
     this.processedRequestIds = new Set();
-    this.scansInFlight       = new Map();
-
-    // Clean up request IDs periodically to prevent memory leaks
     chrome.alarms.create('clearRequestIds', { periodInMinutes: 60 });
     chrome.alarms.onAlarm.addListener(a => {
       if (a.name === 'clearRequestIds') {
-        logger.log('Clearing processed request IDs cache');
         this.processedRequestIds.clear();
       }
     });
-    
     this.init();
   }
 
   init() {
-    // Log extension startup
-    logger.log('PDF Scanner background initializing');
-    
-    // Debug info about the environment
-    if (this.debugMode) {
-      logger.log('Chrome API availability:', {
-        webRequest: !!chrome.webRequest,
-        storage: !!chrome.storage,
-        runtime: !!chrome.runtime
-      });
-    }
-    
     // Initialize the interceptor
     if (interceptor) {
-      logger.log('Initializing request interceptor');
       interceptor.init();
-    } else {
-      logger.error('Interceptor not available');
     }
-    
-    // Load scan stats from storage
     this.loadScanStats();
-    
-    // Set up daily counter reset alarm
     this.setupDailyCounterReset();
-    
     this.bindEvents();
-    logger.log('PDF Scanner background initialized');
-    
-    // Register additional web request listener directly in background
-    this.registerAdditionalRequestListener();
   }
   
   // Save scan statistics to chrome.storage
@@ -209,81 +159,6 @@ class PDFScannerBackground {
     return tomorrow.getTime();
   }
 
-  /**
-   * Register an additional web request listener as backup
-   * Note: In Manifest V3, this is non-blocking
-   */
-  registerAdditionalRequestListener() {
-    try {
-      // Define URL patterns to monitor
-      const urlPatterns = [
-        '*://chat.openai.com/backend-api/*',
-        '*://chat.openai.com/api/*',
-        '*://chat.openai.com/v1/*',
-        '*://chatgpt.com/backend-api/*',
-        '*://chatgpt.com/api/*',
-        '*://chatgpt.com/v1/*',
-        '*://*.openai.com/v1/*',
-        '*://claude.ai/api/*',
-        '*://claude.ai/chat/*',
-        '*://*.anthropic.com/*'
-      ];
-      
-      logger.log('Registering additional web request listener for URLs:', urlPatterns);
-      
-      chrome.webRequest.onBeforeRequest.addListener(
-        (details) => this.handleWebRequest(details),
-        { 
-          urls: urlPatterns,
-          types: ['xmlhttprequest', 'other']
-        },
-        ['requestBody']
-      );
-      
-      logger.log('Additional web request listener registered');
-    } catch (error) {
-      logger.error('Failed to register additional web request listener:', error);
-    }
-  }
-  
-  /**
-   * Handle web request as a backup to the interceptor
-   * Note: In Manifest V3, this cannot block requests
-   * @param {Object} details - Request details
-   */
-  handleWebRequest(details) {
-    try {
-      // ── Request‑level deduplication ──
-      // Skip if we've already processed this requestId
-      if (this.processedRequestIds.has(details.requestId)) {
-        return;          // ignore duplicate onBeforeRequest events
-      }
-      this.processedRequestIds.add(details.requestId);
-
-      // Skip non-POST requests
-      if (details.method !== 'POST') {
-        return;
-      }
-      
-      logger.log('Background detected request:', details.url);
-      
-      // Check if the request has a body
-      if (!details.requestBody) {
-        return;
-      }
-      
-      // Process the request (non-blocking)
-      this.processWebRequest(details).catch(err => {
-        logger.error('Error processing web request:', err);
-      });
-      
-      // In Manifest V3, we cannot block requests with this listener
-      // We rely on content scripts to detect uploads earlier
-    } catch (error) {
-      logger.error('Error in handleWebRequest:', error);
-    }
-  }
-  
   /**
    * Register event listeners for the background script
    */
@@ -481,13 +356,9 @@ class PDFScannerBackground {
         result
       });
       
-      // If secrets found, show notification
-      if (result.secrets) {
-        await this.showNotification({
-          title: 'Security Alert',
-          message: `Secrets detected in PDF: ${filename}`
-        });
-      }
+      // Note: Intercepted scans are for background monitoring only
+      // Tab warnings are only shown for immediate user-initiated scans
+      // This prevents duplicate warnings from showing
       
       // Log the scan
       await this.logScanResult(filename, result);
@@ -516,42 +387,21 @@ class PDFScannerBackground {
 
   async scanPDF(message) {
     const { fileData, filename, fileSize, uniqueId } = message;
+    const scanId = uniqueId || `${filename}_${Date.now()}_${fileSize}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create a truly unique scan key using multiple factors
-    const scanKey = uniqueId || `${filename}_${Date.now()}_${fileSize}_${Math.random()}`;
+    logger.log(`Starting independent scan for: ${filename} (ID: ${scanId})`);
     
-    // Check if we already have this exact scan in flight (prevents duplicate concurrent scans)
-    if (this.scansInFlight.has(scanKey)) {
-      logger.log('Scan already in flight, awaiting result for key:', scanKey);
-      return await this.scansInFlight.get(scanKey);
-    }
-
-    let _resolveScan, _rejectScan;
-    const scanPromise = new Promise((res, rej) => { _resolveScan = res; _rejectScan = rej; });
-    this.scansInFlight.set(scanKey, scanPromise);
-    
-    logger.log(`Starting new scan for: ${filename} (key: ${scanKey})`);
-
     try {
-      // Convert data to blob based on format
       let blob;
-      
       if (fileData.startsWith('data:')) {
-        // It's a data URL
-        logger.log('Processing data URL');
         const response = await fetch(fileData);
         blob = await response.blob();
       } else if (fileData.startsWith('blob:')) {
-        // It's a blob URL
-        logger.log('Processing blob URL');
         const response = await fetch(fileData);
         blob = await response.blob();
       } else if (typeof fileData === 'string' && fileData.startsWith('{')) {
-        // It might be JSON string
-        logger.log('Processing JSON string');
         try {
           const jsonData = JSON.parse(fileData);
-          // Extract base64 data if present
           if (jsonData.data && typeof jsonData.data === 'string') {
             const base64Data = jsonData.data.replace(/^data:application\/pdf;base64,/, '');
             const binaryString = atob(base64Data);
@@ -564,14 +414,10 @@ class PDFScannerBackground {
             throw new Error('JSON data does not contain PDF data');
           }
         } catch (e) {
-          logger.error('Failed to parse JSON data:', e);
           throw new Error('Invalid PDF data format');
         }
       } else {
-        // Assume it's base64 data
-        logger.log('Processing as base64 data');
         try {
-          // Try to extract base64 part if it's a data URL
           const base64Data = fileData.replace(/^data:application\/pdf;base64,/, '');
           const binaryString = atob(base64Data);
           const bytes = new Uint8Array(binaryString.length);
@@ -580,167 +426,32 @@ class PDFScannerBackground {
           }
           blob = new Blob([bytes], { type: 'application/pdf' });
         } catch (e) {
-          logger.error('Failed to convert base64 to blob:', e);
           throw new Error('Invalid PDF data format');
         }
       }
-
-      // For Day 3, we'll use the real backend service
-      try {
-        const formData   = this.createFormData(blob, filename);
-        const res = await this.sendToLocalBackend(formData, filename);
-        _resolveScan(res);
-        return res;
-      } catch (error) {
-        logger.error('Backend scan failed – aborting scan:', error);
-        _resolveScan(error);
-        throw error;                       // ⇦ bubble up
-      }
-    } catch (error) {
-      logger.error('PDF scan error:', error);
-      if (_rejectScan) _rejectScan(error);
-      throw new Error(`Failed to scan PDF: ${error.message}`);
-    }
-    finally {
-      // Always clean up the scan from the in-flight map
-      this.scansInFlight.delete(scanKey);
-      logger.log(`Scan completed and removed from in-flight for key: ${scanKey}`);
-    }
-  }
-
-  // Day 2: Use local mock backend
-  async scanWithMockBackend(blob, fileName) {
-    logger.log('Scanning PDF with mock backend...');
-
-    try {
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
       
-      // Create form data
-      const formData = new FormData();
-      formData.append('pdf', blob, fileName);
-      formData.append('filename', fileName);
+      const formData = this.createFormData(blob, filename);
+      logger.log(`Sending scan request for: ${filename} (ID: ${scanId})`);
       
-      // Try to send to local backend (non-blocking)
-      this.sendToLocalBackend(formData, fileName).catch(err => {
-        logger.error('Error sending to local backend:', err);
-      });
-      
-      // For Day 2, we'll continue to use simulation logic,
-      // but with better heuristics
-      
-      // Check if filename contains test keywords to simulate different responses
-      const hasSecrets =
-        fileName.toLowerCase().includes('secret') ||
-        fileName.toLowerCase().includes('aws') ||
-        fileName.toLowerCase().includes('key') ||
-        fileName.toLowerCase().includes('pass') ||
-        fileName.toLowerCase().includes('token') ||
-        fileName.toLowerCase().includes('auth');
-
-      if (hasSecrets) {
-        return {
-          secrets: true,
-          findings: [
-            {
-              type: 'AWS_ACCESS_KEY',
-              confidence: 0.95,
-              location: 'page 1, line 15',
-            },
-            {
-              type: 'PASSWORD',
-              confidence: 0.88,
-              location: 'page 2, line 7',
-            }
-          ],
-          action: 'block', // Updated to block instead of just log
-          scannedAt: new Date().toISOString(),
-        };
-      } else {
-        return {
-          secrets: false,
-          findings: [],
-          action: 'allow',
-          scannedAt: new Date().toISOString(),
-        };
-      }
-    } catch (error) {
-      logger.error('Mock backend scan failed:', error);
-      throw error;
-    }
-  }
-  
-  /**
-   * Attempt to send PDF to local backend for scanning
-   * @param {FormData} formData - Form data with PDF
-   * @param {string} fileName - PDF filename
-   */
-  async sendToLocalBackend(formData, fileName) {
-    try {
-      logger.log(`Sending ${fileName} to local backend at ${this.BACKEND_URL}/scan`);
-      
-      const response = await fetch(`${this.BACKEND_URL}/scan`, {
+      const response = await fetch(this.API_URL, {
         method: 'POST',
         body: formData,
-        mode: 'cors',
-        credentials: 'omit',
         headers: {
-          'X-App-ID': this.APP_ID,
-          'Accept': 'application/json'
+          'X-App-ID': this.APP_ID
         }
       });
       
       if (!response.ok) {
-        throw new Error(`Backend responded with ${response.status}: ${response.statusText}`);
+        throw new Error(`API responded with ${response.status}: ${response.statusText}`);
       }
       
       const result = await response.json();
-      logger.log('Local backend scan result:', result);
+      logger.log(`Scan completed for: ${filename} (ID: ${scanId}), secrets: ${result.secrets}`);
       
-      // Map findings to ensure they have all needed properties
-      if (result.findings && Array.isArray(result.findings)) {
-        // Keep the full findings data from the API instead of mapping/transforming it
-        // This ensures all details like entity_type, category, and value are preserved
-        // We'll handle display formatting in the content script
-      }
-      
-      return {
-        secrets: result.secrets || false,
-        findings: result.findings || [],
-        action: result.action || 'allow',
-        scannedAt: result.scannedAt || new Date().toISOString(),
-      };
-    } catch (error) {
-      logger.error('Local backend scan failed:', error);
-      
-      throw error;
-    }
-  }
-
-  // Real implementation for future days
-  async performRealScan(blob, fileName) {
-    // This will be implemented in Day 3 with actual backend integration
-    logger.log('Real scan implementation coming in Day 3...');
-
-    // Convert blob to FormData for backend
-    const formData = new FormData();
-    formData.append('pdf', blob, fileName);
-
-    try {
-      const response = await fetch(`${this.BACKEND_URL}/scan`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend responded with ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
       return result;
     } catch (error) {
-      logger.error('Backend scan failed:', error);
-      throw new Error(`Scan service unavailable: ${error.message}`);
+      logger.error(`Scan failed for: ${filename} (ID: ${scanId}):`, error.message);
+      throw new Error(`Failed to scan PDF: ${error.message}`);
     }
   }
 
@@ -777,7 +488,6 @@ class PDFScannerBackground {
   createFormData(blob, filename) {
     const formData = new FormData();
     formData.append('pdf', blob, filename);
-    formData.append('filename', filename);
     return formData;
   }
   

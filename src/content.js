@@ -1363,10 +1363,22 @@ class PDFMonitor {
    */
   async scanPDFImmediately(file) {
     try {
+      // Add extensive debug logging to track file contamination
+      logger.log(`=== IMMEDIATE SCAN START ===`);
       logger.log(`Scanning PDF immediately: ${file.name} (${file.size} bytes)`);
+      logger.log(`File details:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        webkitRelativePath: file.webkitRelativePath || 'N/A'
+      });
       
       // Read file as data URL
       const fileData = await this.readFileAsDataURL(file);
+      
+      // Log the actual data size after reading
+      logger.log(`File data read, sending to background. Data length: ${fileData ? fileData.length : 0}`);
       
       // Send to background script for scanning
       const response = await this.sendMessage({
@@ -1380,6 +1392,7 @@ class PDFMonitor {
         throw new Error(response?.error || 'Unknown error scanning PDF');
       }
       
+      logger.log(`=== IMMEDIATE SCAN COMPLETE ===`);
       return response.result;
     } catch (error) {
       logger.error('Error scanning PDF immediately:', error);
@@ -1410,11 +1423,25 @@ class PDFMonitor {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       
+      // Add debug logging
+      logger.log(`Reading file: ${file.name}, size: ${file.size}, type: ${file.type}, lastModified: ${file.lastModified}`);
+      
       reader.onload = () => {
-        resolve(reader.result);
+        const result = reader.result;
+        const dataSize = result ? result.length : 0;
+        logger.log(`File read complete: ${file.name}, data size: ${dataSize}`);
+        
+        // Log a preview of the data to help debug contamination
+        if (result && typeof result === 'string') {
+          const preview = result.substring(0, 100);
+          logger.log(`File data preview: ${preview}...`);
+        }
+        
+        resolve(result);
       };
       
       reader.onerror = () => {
+        logger.error(`Failed to read file: ${file.name}`);
         reject(new Error('Failed to read file'));
       };
       

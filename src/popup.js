@@ -69,14 +69,12 @@ class PDFScannerPopup {
     this.statusIndicator = document.getElementById('status-indicator');
     this.statusText = document.querySelector('.status-text');
     this.scanCountElement = document.getElementById('scan-count');
-    this.viewLogsBtn = document.getElementById('view-logs');
     this.devBadgeContainer = document.getElementById('dev-badge-container');
     
     // Log if any elements are missing
     if (!this.statusIndicator) logger.error('Missing element: #status-indicator');
     if (!this.statusText) logger.error('Missing element: .status-text');
     if (!this.scanCountElement) logger.error('Missing element: #scan-count');
-    if (!this.viewLogsBtn) logger.error('Missing element: #view-logs');
     if (!this.devBadgeContainer && this.checkDevelopment && this.checkDevelopment()) logger.warn('Dev badge container missing (dev mode only)');
   }
   
@@ -86,9 +84,6 @@ class PDFScannerPopup {
   init() {
     try {
       logger.log('Initializing PDF Scanner Popup');
-      
-      // Bind event handlers
-      this.bindEvents();
       
       // Load scan statistics
       this.loadScanStats();
@@ -169,27 +164,6 @@ class PDFScannerPopup {
   }
   
   /**
-   * Toggle the active state of the scanner
-   */
-  async toggleActiveState() {
-    try {
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'TOGGLE_ACTIVE_STATE' 
-      });
-      
-      if (response && response.success) {
-        this.state.isActive = response.isActive;
-        this.updateStatusDisplay();
-        logger.log(`Scanner ${this.state.isActive ? 'activated' : 'deactivated'}`);
-      } else {
-        logger.error('Error toggling active state:', response);
-      }
-    } catch (error) {
-      logger.error('Error toggling active state:', error);
-    }
-  }
-  
-  /**
    * Update the status display based on current state
    */
   updateStatusDisplay() {
@@ -224,59 +198,6 @@ class PDFScannerPopup {
       }
     } catch (error) {
       logger.error('Error updating status display:', error);
-    }
-  }
-  
-  /**
-   * Bind event handlers to UI elements
-   */
-  bindEvents() {
-    try {
-      // Status indicator click handler
-      if (this.statusIndicator) {
-        this.statusIndicator.addEventListener('click', () => {
-          this.toggleActiveState();
-        });
-      }
-      
-      // Status text click handler (for better UX)
-      if (this.statusText) {
-        this.statusText.addEventListener('click', () => {
-          this.toggleActiveState();
-        });
-      }
-      
-      // View logs button handler
-      if (this.viewLogsBtn) {
-        this.viewLogsBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.openDevToolsConsole();
-        });
-      }
-      
-      logger.log('Event handlers bound');
-    } catch (error) {
-      logger.error('Error binding events:', error);
-    }
-  }
-  
-  /**
-   * Open Chrome DevTools console
-   */
-  openDevToolsConsole() {
-    try {
-      // This will output a special console message that helps
-      // users find the logs when DevTools opens
-      console.log('%c PDF Scanner Logs ', 
-        'background: #2196F3; color: white; font-size: 16px; font-weight: bold; padding: 4px;');
-      console.log('Look for log messages prefixed with [PDF Scanner] to find scanner activity.');
-      
-      // Create and trigger a keyboard event to open DevTools
-      // Note: This is a hacky way and might not work in all browsers/scenarios
-      // The better approach is to include instructions for the user
-      chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id });
-    } catch (error) {
-      logger.error('Error opening DevTools console:', error);
     }
   }
 }
