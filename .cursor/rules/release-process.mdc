@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	1.	Milestone done, no P1s → cut release/vX.Y.Z.
+	2.	CI + QA on staging; audit & manual extension review.
+	3.	Tag, build deterministic zip & backend image.
+	4.	Publish: Chrome Web Store + prod deploy.
+	5.	Merge back, bump to next-dev, create release notes.
+	6.	Monitor 24 h; hotfix branch if needed.

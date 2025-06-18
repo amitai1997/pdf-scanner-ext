@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	1.	Permissions: list exact origins, never <all_urls>.
+	2.	CSP: script-src 'self'; object-src 'none'.
+	3.	Content scripts only relay sanitized messages.
+	4.	Validate each message & sender.
+	5.	No unsafe DOM APIs; use textContent.
+	6.	HTTPS fetch only; tokens in storage.session.
+	7.	Audit deps; block critical CVEs in CI.
+	8.	Deterministic build; review manifest diff before publish.

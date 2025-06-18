@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Type	Purpose
+main	release-ready
+feature/	new work
+fix/	bug
+hotfix/	urgent prod
+
+	•	Name: type/123-slug.
+	•	Squash-merge with green CI; delete branch.
+	•	Tags: vX.Y.Z; release branches freeze features.

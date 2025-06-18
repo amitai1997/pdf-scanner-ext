@@ -1,0 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Get a dev box from zero to running in minutes.
+	1.	Install Git, Node LTS (nvm), Docker, Chrome.
+	2.	git clone <repo> && git checkout -b <feature>
+	3.	npm ci (frontend) & pip install -r (if backend added).
+	4.	Copy env-sample.env ➜ .env; fill keys from vault.
+	5.	Import claude_desktop_config.json in Claude Desktop; ensure all servers show connected.
+	6.	Start services: npm run dev, docker compose up, etc.
+	7.	Run npm test, eslint, pre-commit; aim ≥ 85 % coverage.
+	8.	Common fixes: nvm use, free port, refresh MCP token.

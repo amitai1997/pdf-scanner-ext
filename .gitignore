@@ -28,8 +28,8 @@ yarn-error.log*
 *.swo
 .DS_Store
 
-# Cursor-specific files
-.cursor/
+# Development artifacts
+extension-logs.txt
 
 # Temporary files
 tmp/
