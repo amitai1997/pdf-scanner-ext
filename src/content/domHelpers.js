@@ -1,6 +1,6 @@
-import { logger } from './logger.js';
+// Dependencies loaded via manifest.json script order
 
-export function loadSharedCSS() {
+function loadSharedCSS() {
   try {
     if (!document || !document.head) {
       if (document.readyState === 'loading') {
@@ -28,7 +28,7 @@ export function loadSharedCSS() {
   }
 }
 
-export function loadSharedCSSToBody() {
+function loadSharedCSSToBody() {
   try {
     if (!document.body || document.getElementById('pdf-scanner-shared-css')) {
       return;
@@ -43,7 +43,7 @@ export function loadSharedCSSToBody() {
   }
 }
 
-export function removeExistingIndicators() {
+function removeExistingIndicators() {
   try {
     const existingIndicator = document.getElementById('pdf-scanner-indicator');
     if (existingIndicator) {
@@ -54,7 +54,7 @@ export function removeExistingIndicators() {
   }
 }
 
-export function removeExistingSecurityWarnings() {
+function removeExistingSecurityWarnings() {
   try {
     const existingWarning = document.getElementById('pdf-scanner-security-warning');
     if (existingWarning) {

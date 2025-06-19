@@ -1,7 +1,6 @@
-import { logger } from './logger.js';
-import { PDF_CONSTANTS } from './constants.js';
+// Dependencies loaded via manifest.json script order
 
-export function monitorXHRAndFetch() {
+function monitorXHRAndFetch() {
   try {
     const originalXHROpen = XMLHttpRequest.prototype.open;
     const originalXHRSend = XMLHttpRequest.prototype.send;
@@ -73,7 +72,7 @@ export function monitorXHRAndFetch() {
   }
 }
 
-export function checkIfBodyContainsPDF(body) {
+function checkIfBodyContainsPDF(body) {
   try {
     return _checkIfBodyContainsPDFShared(body);
   } catch (e) {
@@ -82,7 +81,7 @@ export function checkIfBodyContainsPDF(body) {
   }
 }
 
-export function _checkIfBodyContainsPDFShared(body) {
+function _checkIfBodyContainsPDFShared(body) {
   if (!body) return false;
   if (typeof body === 'string') {
     return (
@@ -107,7 +106,7 @@ export function _checkIfBodyContainsPDFShared(body) {
   return false;
 }
 
-export function _isPdfCandidate(file) {
+function _isPdfCandidate(file) {
   if (!file) return false;
   if (file.type && PDF_CONSTANTS.PDF_MIME_TYPES.includes(file.type)) {
     return true;
@@ -124,7 +123,7 @@ export function _isPdfCandidate(file) {
   return false;
 }
 
-export async function extractPDFFromBody(body) {
+async function extractPDFFromBody(body) {
   try {
     if (!body) return null;
     if (body instanceof FormData) {

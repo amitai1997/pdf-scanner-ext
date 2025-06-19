@@ -1,15 +1,6 @@
-import { logger } from './logger.js';
-import { PDFMonitorUI, showStandaloneError } from './ui.js';
-import {
-  monitorXHRAndFetch,
-  checkIfBodyContainsPDF,
-  _checkIfBodyContainsPDFShared,
-  _isPdfCandidate,
-  extractPDFFromBody,
-} from './xhrFetchInterceptor.js';
-import * as watchers from './watchers.js';
+// Dependencies loaded via manifest.json script order
 
-export class PDFMonitor {
+class PDFMonitor {
   constructor() {
     this.fileInputs = new Set();
     this.uploadState = {
@@ -229,7 +220,38 @@ export class PDFMonitor {
   }
 }
 
-Object.assign(PDFMonitor.prototype, watchers);
+// Assign watcher functions to PDFMonitor prototype
+PDFMonitor.prototype.startMonitoring = startMonitoring;
+PDFMonitor.prototype.checkForChatGPTFileElements = checkForChatGPTFileElements;
+PDFMonitor.prototype.addWarningIndicatorToAttachment = addWarningIndicatorToAttachment;
+PDFMonitor.prototype.setupDragAndDropMonitoring = setupDragAndDropMonitoring;
+PDFMonitor.prototype.setupClipboardMonitoring = setupClipboardMonitoring;
+PDFMonitor.prototype.monitorFileSelectionDialog = monitorFileSelectionDialog;
+PDFMonitor.prototype.stopMonitoring = stopMonitoring;
+PDFMonitor.prototype.scanForFileInputs = scanForFileInputs;
+PDFMonitor.prototype.setupFormSubmissionMonitoring = setupFormSubmissionMonitoring;
+PDFMonitor.prototype.handleFileInputChange = handleFileInputChange;
+PDFMonitor.prototype.handleFormSubmit = handleFormSubmit;
+PDFMonitor.prototype.handleButtonClick = handleButtonClick;
+PDFMonitor.prototype.trackUpload = trackUpload;
+
+// Assign other utility functions
+// Assign watcher functions to PDFMonitor prototype
+PDFMonitor.prototype.startMonitoring = startMonitoring;
+PDFMonitor.prototype.checkForChatGPTFileElements = checkForChatGPTFileElements;
+PDFMonitor.prototype.addWarningIndicatorToAttachment = addWarningIndicatorToAttachment;
+PDFMonitor.prototype.setupDragAndDropMonitoring = setupDragAndDropMonitoring;
+PDFMonitor.prototype.setupClipboardMonitoring = setupClipboardMonitoring;
+PDFMonitor.prototype.monitorFileSelectionDialog = monitorFileSelectionDialog;
+PDFMonitor.prototype.stopMonitoring = stopMonitoring;
+PDFMonitor.prototype.scanForFileInputs = scanForFileInputs;
+PDFMonitor.prototype.setupFormSubmissionMonitoring = setupFormSubmissionMonitoring;
+PDFMonitor.prototype.handleFileInputChange = handleFileInputChange;
+PDFMonitor.prototype.handleFormSubmit = handleFormSubmit;
+PDFMonitor.prototype.handleButtonClick = handleButtonClick;
+PDFMonitor.prototype.trackUpload = trackUpload;
+
+// Assign other utility functions
 PDFMonitor.prototype.monitorXHRAndFetch = monitorXHRAndFetch;
 PDFMonitor.checkIfBodyContainsPDF = checkIfBodyContainsPDF;
 PDFMonitor._checkIfBodyContainsPDFShared = _checkIfBodyContainsPDFShared;

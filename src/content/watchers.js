@@ -1,5 +1,5 @@
-import { logger } from './logger.js';
-export function startMonitoring() {
+// Dependencies loaded via manifest.json script order
+function startMonitoring() {
   try {
     // Initial scan for existing file inputs
     this.scanForFileInputs();
@@ -44,7 +44,7 @@ export function startMonitoring() {
 /**
  * Check for ChatGPT-specific file upload elements
  */
-export function checkForChatGPTFileElements() {
+function checkForChatGPTFileElements() {
   try {
     // ChatGPT has a specific file upload button
     const fileButtons = document.querySelectorAll(
@@ -190,7 +190,7 @@ export function checkForChatGPTFileElements() {
  * Add a warning indicator to an attachment element
  * @param {HTMLElement} element - Element representing a PDF attachment
  */
-export function addWarningIndicatorToAttachment(element) {
+function addWarningIndicatorToAttachment(element) {
   try {
     // Only add if we haven't already added one
     if (element.querySelector('.pdf-scanner-attachment-warning')) {
@@ -216,7 +216,7 @@ export function addWarningIndicatorToAttachment(element) {
       e.stopPropagation();
       e.preventDefault();
 
-      this.showSecretWarning('Unknown PDF', {
+      this.ui.showSecretWarning('Unknown PDF', {
         secrets: true,
         findings: [{ type: 'POTENTIAL_RISK', confidence: 0.8 }],
       });
@@ -232,7 +232,7 @@ export function addWarningIndicatorToAttachment(element) {
 /**
  * Set up monitoring for drag and drop events
  */
-export function setupDragAndDropMonitoring() {
+function setupDragAndDropMonitoring() {
   try {
     // Monitor dragover events
     document.addEventListener('dragover', (event) => {
@@ -263,7 +263,7 @@ export function setupDragAndDropMonitoring() {
           // Process each dropped PDF file
           pdfFiles.forEach((file) => {
             // Show scanning indicator to user
-            this.showScanningIndicator(file.name);
+            this.ui.showScanningIndicator(file.name);
 
             // Immediate scan of the PDF
             this.scanPDFImmediately(file)
@@ -272,15 +272,15 @@ export function setupDragAndDropMonitoring() {
 
                 if (result.secrets) {
                   // If secrets found, show warning
-                  this.showSecretWarning(file.name, result);
+                  this.ui.showSecretWarning(file.name, result);
                 } else {
                   // If no secrets found, show safe indicator
-                  this.showSafeFileIndicator(file.name);
+                  this.ui.showSafeFileIndicator(file.name);
                 }
               })
               .catch((error) => {
                 logger.error('Error during immediate scan of dropped PDF', error);
-                this.showScanErrorIndicator(file.name);
+                this.ui.showScanErrorIndicator(file.name);
               });
 
             // Also track the upload through our normal channels as backup
@@ -299,7 +299,7 @@ export function setupDragAndDropMonitoring() {
 /**
  * Set up monitoring for clipboard paste events
  */
-export function setupClipboardMonitoring() {
+function setupClipboardMonitoring() {
   try {
     document.addEventListener('paste', (event) => {
       if (event.clipboardData && event.clipboardData.files) {
@@ -325,7 +325,7 @@ export function setupClipboardMonitoring() {
           // Process each pasted PDF file
           pdfFiles.forEach((file) => {
             // Show scanning indicator to user
-            this.showScanningIndicator(file.name);
+            this.ui.showScanningIndicator(file.name);
 
             // Immediate scan of the PDF
             this.scanPDFImmediately(file)
@@ -334,15 +334,15 @@ export function setupClipboardMonitoring() {
 
                 if (result.secrets) {
                   // If secrets found, show warning
-                  this.showSecretWarning(file.name, result);
+                  this.ui.showSecretWarning(file.name, result);
                 } else {
                   // If no secrets found, show safe indicator
-                  this.showSafeFileIndicator(file.name);
+                  this.ui.showSafeFileIndicator(file.name);
                 }
               })
               .catch((error) => {
                 logger.error('Error during immediate scan of pasted PDF', error);
-                this.showScanErrorIndicator(file.name);
+                this.ui.showScanErrorIndicator(file.name);
               });
 
             // Also track the upload through our normal channels as backup
@@ -362,7 +362,7 @@ export function setupClipboardMonitoring() {
  * Monitor for file selection dialog
  * This is a bit hacky but can help detect when a file dialog is opened
  */
-export function monitorFileSelectionDialog() {
+function monitorFileSelectionDialog() {
   try {
     // Override the native file input click method
     const originalClick = HTMLInputElement.prototype.click;
@@ -382,7 +382,7 @@ export function monitorFileSelectionDialog() {
 /**
  * Stop monitoring the page
  */
-export function stopMonitoring() {
+function stopMonitoring() {
   try {
     if (this.observer) {
       this.observer.disconnect();
@@ -403,7 +403,7 @@ export function stopMonitoring() {
 /**
  * Scan the page for file input elements
  */
-export function scanForFileInputs() {
+function scanForFileInputs() {
   try {
     const fileInputs = document.querySelectorAll('input[type="file"]');
 
@@ -431,7 +431,7 @@ export function scanForFileInputs() {
 /**
  * Set up monitoring for form submissions
  */
-export function setupFormSubmissionMonitoring() {
+function setupFormSubmissionMonitoring() {
   try {
     // Find all forms and add submit listener
     document.querySelectorAll('form').forEach((form) => {
@@ -451,7 +451,7 @@ export function setupFormSubmissionMonitoring() {
  * Handle file input change event
  * @param {Event} event - Change event
  */
-export function handleFileInputChange(event) {
+function handleFileInputChange(event) {
   try {
     const input = event.target;
     const files = Array.from(input.files || []);
@@ -483,7 +483,7 @@ export function handleFileInputChange(event) {
       }
 
       // Show scanning indicator to user
-      this.showScanningIndicator(file.name);
+      this.ui.showScanningIndicator(file.name);
 
       // Immediate scan of the PDF
       this.scanPDFImmediately(file)
@@ -492,7 +492,7 @@ export function handleFileInputChange(event) {
 
           if (result.secrets) {
             // If secrets found, show warning and prevent upload if possible
-            this.showSecretWarning(file.name, result);
+            this.ui.showSecretWarning(file.name, result);
 
             // Try to clear the file input to prevent upload
             try {
@@ -509,13 +509,13 @@ export function handleFileInputChange(event) {
           } else {
             // If no secrets found, allow upload to proceed
             logger.log('No secrets found, allowing upload to proceed');
-            this.showSafeFileIndicator(file.name);
+            this.ui.showSafeFileIndicator(file.name);
           }
         })
         .catch((error) => {
           logger.error('Error during immediate PDF scan', error);
           // On error, we allow the upload to proceed but log the error
-          this.showScanErrorIndicator(file.name);
+          this.ui.showScanErrorIndicator(file.name);
         });
 
       // Also track the upload through our normal channels as backup
@@ -530,7 +530,7 @@ export function handleFileInputChange(event) {
  * Handle form submission
  * @param {Event} event - Submit event
  */
-export function handleFormSubmit(event) {
+function handleFormSubmit(event) {
   try {
     const form = event.target;
 
@@ -556,7 +556,7 @@ export function handleFormSubmit(event) {
  * Handle button clicks that might trigger uploads
  * @param {Event} event - Click event
  */
-export function handleButtonClick(event) {
+function handleButtonClick(event) {
   try {
     const button = event.target.closest('button, [role="button"]');
 
@@ -588,7 +588,7 @@ export function handleButtonClick(event) {
  * Track a file upload
  * @param {File} file - File being uploaded
  */
-export function trackUpload(file) {
+function trackUpload(file) {
   try {
     const fileId = `${file.name}-${file.size}-${Date.now()}`;
 

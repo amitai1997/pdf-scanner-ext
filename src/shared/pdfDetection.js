@@ -1,13 +1,13 @@
 /** Library of heuristics for recognising and extracting PDFs from diverse payloads. */
 
-import { PDF_CONSTANTS } from './constants.js';
+// PDF_CONSTANTS is loaded via manifest.json script order
 
 /**
  * Check if a file is a PDF candidate based on various heuristics
  * @param {File|Blob|Object} file - File object or file-like object
  * @returns {boolean} - Whether the file is likely a PDF
  */
-export function isPdfCandidate(file) {
+function isPdfCandidate(file) {
   if (!file) return false;
   
   // Check MIME type
@@ -36,7 +36,7 @@ export function isPdfCandidate(file) {
  * @param {any} body - Request body (FormData, Blob, File, string, etc.)
  * @returns {boolean} - Whether the body likely contains a PDF
  */
-export function checkIfBodyContainsPDF(body) {
+function checkIfBodyContainsPDF(body) {
   try {
     if (!body) return false;
     
@@ -76,7 +76,7 @@ export function checkIfBodyContainsPDF(body) {
  * @param {string} headers - Headers section of a multipart part
  * @returns {boolean} - True if this part contains a PDF
  */
-export function isPDFPart(headers) {
+function isPDFPart(headers) {
   if (!headers) {
     return false;
   }
@@ -100,7 +100,7 @@ export function isPDFPart(headers) {
  * @param {string} data - String to check
  * @returns {boolean} - Whether the string appears to be base64 PDF data
  */
-export function isBase64PDF(data) {
+function isBase64PDF(data) {
   if (!data || typeof data !== 'string' || data.length < 10) {
     return false;
   }
@@ -133,7 +133,7 @@ export function isBase64PDF(data) {
  * @param {number} size - File size in bytes
  * @returns {boolean} - Whether the file is too large
  */
-export function isFileTooLarge(size) {
+function isFileTooLarge(size) {
   return size > PDF_CONSTANTS.MAX_PDF_SIZE;
 }
 
@@ -142,7 +142,7 @@ export function isFileTooLarge(size) {
  * @param {any} body - Request body (FormData, Blob, File, string, etc.)
  * @returns {Promise<Object|null>} - PDF data or null
  */
-export async function extractPDFFromBody(body) {
+async function extractPDFFromBody(body) {
   try {
     if (!body) return null;
     
@@ -213,7 +213,7 @@ function _fileToDataURL(file) {
  * @param {string} headers - Headers section of a multipart part
  * @returns {string|null} - Filename or null if not found
  */
-export function extractFilename(headers) {
+function extractFilename(headers) {
   if (!headers) {
     return null;
   }

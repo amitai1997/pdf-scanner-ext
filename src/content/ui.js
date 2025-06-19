@@ -1,1 +1,1 @@
-export { PDFMonitorUI, showStandaloneError } from '../ui/PDFMonitorUI.js';
+// PDFMonitorUI and showStandaloneError are loaded via manifest.json script order

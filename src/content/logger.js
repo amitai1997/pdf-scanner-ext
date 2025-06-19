@@ -1,8 +1,13 @@
-import { Logger } from '../shared/logger.js';
+// Dependencies loaded via manifest.json script order
 
 let logger;
 try {
-  logger = new Logger({ prefix: '[PDF Scanner]' });
+  // Try to use shared logger if available
+  if (typeof Logger !== 'undefined') {
+    logger = new Logger({ prefix: '[PDF Scanner]' });
+  } else {
+    throw new Error('Logger not available');
+  }
 } catch (e) {
   logger = {
     log(msg, data) {
@@ -35,4 +40,4 @@ try {
   };
 }
 
-export { logger };
+// logger is now globally available

@@ -1,6 +1,4 @@
-import { loadSharedCSS } from './domHelpers.js';
-import { PDFMonitor } from './pdfMonitor.js';
-import { showStandaloneError } from './ui.js';
+// Dependencies loaded via manifest.json script order
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', loadSharedCSS);
