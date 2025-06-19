@@ -984,15 +984,18 @@ class PDFMonitor {
             } catch (e) {
               logger.error('Error clearing file input', e);
             }
+          } else if (result.action === 'warn') {
+            // Show warning for extraction errors but allow upload
+            this.showExtractionWarning(file.name, result);
           } else {
-            // If no secrets found, allow upload to proceed
+            // If no secrets found and no extraction errors, allow upload to proceed
             logger.log('No secrets found, allowing upload to proceed');
             this.showSafeFileIndicator(file.name);
           }
         }).catch(error => {
           logger.error('Error during immediate PDF scan', error);
-          // On error, we allow the upload to proceed but log the error
-          this.showScanErrorIndicator(file.name);
+          // On error, show extraction warning
+          this.showExtractionWarning(file.name, { note: 'Failed to scan PDF' });
         });
         
         // Also track the upload through our normal channels as backup
@@ -1180,26 +1183,115 @@ class PDFMonitor {
   }
   
   /**
-   * Handle scan result from service worker
-   * @param {Object} message - Scan result message
+   * Handle scan result from background script
    */
   handleScanResult(message) {
-    try {
-      const { requestId, result, filename } = message;
-      
-      logger.log('Received scan result', { 
-        requestId, 
-        filename,
-        hasSecrets: result.secrets 
-      });
-      
-      if (result.secrets) {
-        this.showSecretWarning(filename, result);
-      }
-      
-    } catch (error) {
-      logger.error('Error handling scan result', { error: error.message });
+    const { fileId, result } = message;
+    
+    // Get upload info
+    const uploadInfo = this.uploadState.pendingScans.get(fileId);
+    if (!uploadInfo) {
+      logger.warn('No pending scan found for file', { fileId });
+      return;
     }
+    
+    const { filename } = uploadInfo;
+    
+    // Remove from pending scans
+    this.uploadState.pendingScans.delete(fileId);
+    
+    // Remove any existing indicators/warnings first
+    this.removeExistingIndicators();
+    this.removeExistingSecurityWarnings();
+    
+    // Handle different scan results based on action
+    switch (result.action) {
+      case 'block':
+        // Secrets found - show warning and block
+        this.showSecretWarning(filename, result);
+        break;
+        
+      case 'warn':
+        // Text extraction failed or other warning condition
+        this.showExtractionWarning(filename, result);
+        break;
+        
+      case 'allow':
+        // Only show safe indicator if explicitly marked as safe
+        if (result.safe === true) {
+          this.showSafeFileIndicator(filename);
+        }
+        break;
+        
+      default:
+        logger.warn('Unknown scan result action:', result.action);
+        // Show generic warning for unknown states
+        this.showExtractionWarning(filename, {
+          ...result,
+          note: 'Unexpected scan result'
+        });
+    }
+  }
+  
+  /**
+   * Show warning for files that couldn't be properly scanned
+   */
+  showExtractionWarning(filename, result) {
+    this.removeExistingIndicators();
+    this.removeExistingSecurityWarnings();
+    
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'pdf-scanner-security-warning';
+    warningDiv.className = 'pdf-scanner-modal pdf-scanner-warning-bg';
+    warningDiv.style.zIndex = UI_CONSTANTS.Z_INDEX.WARNING_MODAL;
+    
+    const warningContent = document.createElement('div');
+    warningContent.className = 'pdf-scanner-modal-content';
+    
+    const warningIcon = document.createElement('div');
+    warningIcon.className = 'pdf-scanner-warning-icon';
+    warningIcon.textContent = '⚠️';
+    
+    const warningTitle = document.createElement('h3');
+    warningTitle.className = 'pdf-scanner-warning-text';
+    warningTitle.textContent = 'PDF Scan Warning';
+    
+    const warningMessage = document.createElement('div');
+    warningMessage.className = 'pdf-scanner-modal-message';
+    warningMessage.innerHTML = `
+      <p>Unable to properly scan "${filename}" for sensitive information.</p>
+      <p>${result.note || 'No text could be extracted from this file.'}</p>
+      <p>Please verify that this file does not contain any sensitive information before uploading.</p>
+    `;
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'pdf-scanner-modal-buttons';
+    
+    const closeButton = document.createElement('button');
+    closeButton.className = 'pdf-scanner-modal-button pdf-scanner-modal-button-secondary';
+    closeButton.textContent = 'I understand';
+    closeButton.onclick = () => {
+      warningDiv.remove();
+    };
+    
+    buttonContainer.appendChild(closeButton);
+    warningContent.appendChild(warningIcon);
+    warningContent.appendChild(warningTitle);
+    warningContent.appendChild(warningMessage);
+    warningContent.appendChild(buttonContainer);
+    warningDiv.appendChild(warningContent);
+    
+    document.body.appendChild(warningDiv);
+    
+    // Add escape key handler
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        warningDiv.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+    this._currentEscHandler = escHandler;
   }
   
   /**
@@ -1369,151 +1461,6 @@ class PDFMonitor {
     } catch (error) {
       logger.error('Error showing secret warning', { error: error.message });
     }
-  }
-  
-  /**
-   * Send message to service worker
-   * @param {Object} message - Message to send
-   * @returns {Promise} - Response promise
-   */
-  sendMessage(message) {
-    return new Promise((resolve, reject) => {
-      try {
-        // Check if chrome.runtime is available
-        if (!chrome || !chrome.runtime) {
-          // Extension context might be invalid or not fully loaded
-          return reject(new Error('Extension context unavailable'));
-        }
-        
-        chrome.runtime.sendMessage(message, response => {
-          // Check immediately for last error to catch context invalidation
-          const runtimeError = chrome.runtime.lastError;
-          if (runtimeError) {
-            if (runtimeError.message.includes('context invalidated')) {
-              // Handle context invalidated error specially - this can happen during extension reloads
-              this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
-              console.error('[PDF Scanner] Extension context invalidated. The extension may have been reloaded.');
-              return reject(new Error('Extension context invalidated'));
-            }
-            return reject(runtimeError);
-          }
-          
-          if (!response) {
-            return reject(new Error('No response received from background script'));
-          }
-          
-          resolve(response);
-        });
-      } catch (error) {
-        // Show a more user-friendly error
-        if (error.message.includes('Extension context') || 
-            error.message.includes('invalidated') ||
-            error.message.includes('destroyed')) {
-          this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
-          console.error('[PDF Scanner] Extension context error:', error);
-        }
-        reject(error);
-      }
-    });
-  }
-  
-  /**
-   * Scan a PDF file immediately upon selection
-   * @param {File} file - PDF file to scan
-   * @returns {Promise<Object>} - Scan result
-   */
-  async scanPDFImmediately(file) {
-    try {
-      // Add extensive debug logging to track file contamination
-      logger.log(`=== IMMEDIATE SCAN START ===`);
-      logger.log(`Scanning PDF immediately: ${file.name} (${file.size} bytes)`);
-      logger.log(`File details:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-        webkitRelativePath: file.webkitRelativePath || 'N/A'
-      });
-      
-      // Read file as data URL
-      const fileData = await this.readFileAsDataURL(file);
-      
-      // Log the actual data size after reading
-      logger.log(`File data read, sending to background. Data length: ${fileData ? fileData.length : 0}`);
-      
-      // Send to background script for scanning
-      const response = await this.sendMessage({
-        type: 'scan',
-        filename: file.name,
-        fileSize: file.size,
-        fileData: fileData
-      });
-      
-      if (!response || !response.success) {
-        throw new Error(response?.error || 'Unknown error scanning PDF');
-      }
-      
-      logger.log(`=== IMMEDIATE SCAN COMPLETE ===`);
-      return response.result;
-    } catch (error) {
-      logger.error('Error scanning PDF immediately:', error);
-      
-      // Handle specific error types
-      if (error.message.includes('Scanning service temporarily unavailable') || 
-          error.message.includes('Scanning service unavailable')) {
-        this.showScanErrorIndicator(
-          file.name,
-          'Security scanning service is temporarily unavailable. Please try uploading again in a moment.'
-        );
-      } else if (error.message.includes('Extension context') || 
-          error.message.includes('invalidated') || 
-          error.message.includes('unavailable')) {
-        this.showScanErrorIndicator(
-          file.name,
-          'Extension was reloaded or is unavailable. Please refresh the page and try again.'
-        );
-      } else {
-        // For other errors, show a generic scan error
-        this.showScanErrorIndicator(file.name, `Scan error: ${error.message}`);
-      }
-      
-      throw error;
-    }
-  }
-  
-  /**
-   * Read file as data URL
-   * @param {File} file - File to read
-   * @returns {Promise<string>} - Data URL
-   */
-  readFileAsDataURL(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      // Add debug logging
-      logger.log(`Reading file: ${file.name}, size: ${file.size}, type: ${file.type}, lastModified: ${file.lastModified}`);
-      
-      reader.onload = () => {
-        const result = reader.result;
-        const dataSize = result ? result.length : 0;
-        logger.log(`File read complete: ${file.name}, data size: ${dataSize}`);
-        
-        // Log a preview of the data to help debug contamination
-        if (result && typeof result === 'string') {
-          const preview = result.substring(0, 100);
-          logger.log(`File data preview: ${preview}...`);
-        }
-        
-        resolve(result);
-      };
-      
-      reader.onerror = () => {
-        logger.error(`Failed to read file: ${file.name}`);
-        reject(new Error('Failed to read file'));
-      };
-      
-      reader.readAsDataURL(file);
-    });
   }
   
   /**
@@ -1705,6 +1652,140 @@ class PDFMonitor {
     } catch (error) {
       logger.error('Error removing existing security warnings:', error);
     }
+  }
+
+  /**
+   * Send message to background script
+   */
+  sendMessage(message) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Check if chrome.runtime is available
+        if (!chrome || !chrome.runtime) {
+          return reject(new Error('Extension context unavailable'));
+        }
+        
+        chrome.runtime.sendMessage(message, response => {
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            if (runtimeError.message.includes('context invalidated')) {
+              this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+              console.error('[PDF Scanner] Extension context invalidated.');
+              return reject(new Error('Extension context invalidated'));
+            }
+            return reject(runtimeError);
+          }
+          
+          if (!response) {
+            return reject(new Error('No response received from background script'));
+          }
+          
+          resolve(response);
+        });
+      } catch (error) {
+        if (error.message.includes('Extension context') || 
+            error.message.includes('invalidated') ||
+            error.message.includes('destroyed')) {
+          this.showScanErrorIndicator(message.filename || 'File', 'Extension was reloaded. Please try again.');
+          console.error('[PDF Scanner] Extension context error:', error);
+        }
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Scan a PDF file immediately upon selection
+   */
+  async scanPDFImmediately(file) {
+    try {
+      logger.log('=== IMMEDIATE SCAN START ===');
+      logger.log(`Scanning PDF immediately: ${file.name} (${file.size} bytes)`);
+      logger.log('File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        webkitRelativePath: file.webkitRelativePath || 'N/A'
+      });
+      
+      // Track this upload
+      const fileId = this.trackUpload(file);
+      
+      // Read file as data URL
+      const fileData = await this.readFileAsDataURL(file);
+      logger.log(`File data read, sending to background. Data length: ${fileData ? fileData.length : 0}`);
+      
+      // Send to background script for scanning
+      const response = await this.sendMessage({
+        type: 'scan',
+        fileId,
+        filename: file.name,
+        fileSize: file.size,
+        fileData: fileData
+      });
+      
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'Unknown error scanning PDF');
+      }
+      
+      logger.log('=== IMMEDIATE SCAN COMPLETE ===');
+      logger.log('Immediate scan result:', response.result);
+      
+      return response.result;
+    } catch (error) {
+      logger.error('Error scanning PDF immediately:', error);
+      
+      if (error.message.includes('Scanning service temporarily unavailable') || 
+          error.message.includes('Scanning service unavailable')) {
+        this.showScanErrorIndicator(
+          file.name,
+          'Security scanning service is temporarily unavailable. Please try uploading again in a moment.'
+        );
+      } else if (error.message.includes('Extension context') || 
+          error.message.includes('invalidated') || 
+          error.message.includes('unavailable')) {
+        this.showScanErrorIndicator(
+          file.name,
+          'Extension was reloaded or is unavailable. Please refresh the page and try again.'
+        );
+      } else {
+        this.showScanErrorIndicator(file.name, `Scan error: ${error.message}`);
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Read file as data URL
+   */
+  readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      logger.log(`Reading file: ${file.name}, size: ${file.size}, type: ${file.type}, lastModified: ${file.lastModified}`);
+      
+      reader.onload = () => {
+        const result = reader.result;
+        const dataSize = result ? result.length : 0;
+        logger.log(`File read complete: ${file.name}, data size: ${dataSize}`);
+        
+        if (result && typeof result === 'string') {
+          const preview = result.substring(0, 100);
+          logger.log(`File data preview: ${preview}...`);
+        }
+        
+        resolve(result);
+      };
+      
+      reader.onerror = () => {
+        logger.error(`Failed to read file: ${file.name}`);
+        reject(new Error('Failed to read file'));
+      };
+      
+      reader.readAsDataURL(file);
+    });
   }
 }
 

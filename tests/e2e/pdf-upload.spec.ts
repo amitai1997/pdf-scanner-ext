@@ -159,4 +159,31 @@ test.describe('PDF Upload Tests', () => {
       // If timeout error, that's good - means no attachment appeared
     }
   });
+
+  test('should show warning for PDF with extraction issues', async ({ page }) => {
+    const uploadButton = page.locator('button[aria-label="upload file"]');
+    await uploadButton.waitFor({ state: 'visible' });
+    
+    const fileInput = page.locator('input[type="file"]');
+    const unreadablePdfPath = path.join(__dirname, 'fixtures', 'unreadable.pdf');
+    
+    await fileInput.setInputFiles(unreadablePdfPath);
+    
+    // Verify warning appears
+    const warning = page.locator('#pdf-scanner-security-warning');
+    await expect(warning).toBeVisible({ timeout: 5000 });
+    
+    // Verify it's a warning style (yellow) not an error (red)
+    await expect(warning).toHaveClass(/pdf-scanner-warning-bg/);
+    
+    // Verify warning contains correct text
+    const warningText = page.locator('.pdf-scanner-modal-message');
+    await expect(warningText).toContainText('Unable to properly scan');
+    await expect(warningText).toContainText('verify that this file does not contain any sensitive information');
+    
+    // Verify the file still appears in attachments (warning doesn't block upload)
+    const attachment = page.locator('[data-testid="attachment"]');
+    await expect(attachment).toBeVisible();
+    await expect(attachment).toContainText('unreadable.pdf');
+  });
 }); 

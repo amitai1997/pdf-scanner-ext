@@ -165,7 +165,10 @@ async function extractPDFTextDeterministic(buffer, filename) {
                     logger.info(`AWS key found in decoded content!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
-                  } else {
+                  }
+                  
+                  // Only append if we haven't found secrets yet
+                  if (!extractedText.includes('AKIA')) {
                     extractedText += ' ' + decompressedText;
                   }
                 } catch (decodeError) {
@@ -174,8 +177,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   // Fallback: search for patterns in the raw ASCII85 data
                   const awsInStream = streamData.match(/AKIA[A-Z0-9]{16}/g);
                   if (awsInStream) {
-                    extractedText += ' ' + awsInStream.join(' ');
+                    extractedText = awsInStream.join(' '); // Replace with AWS keys
                     logger.info(`Found AWS keys in raw ASCII85 stream: ${awsInStream.join(', ')}`);
+                    break; // Stop processing other streams
                   }
                 }
               } else {
@@ -192,7 +196,10 @@ async function extractPDFTextDeterministic(buffer, filename) {
                     logger.info(`AWS key found!`);
                     extractedText = decompressedText; // Use ONLY this content
                     break; // Stop processing other streams
-                  } else {
+                  }
+                  
+                  // Only append if we haven't found secrets yet
+                  if (!extractedText.includes('AKIA')) {
                     extractedText += ' ' + decompressedText;
                   }
                 } catch (decompError) {
@@ -208,59 +215,26 @@ async function extractPDFTextDeterministic(buffer, filename) {
         logger.warn(`Error in stream decompression: ${e.message}`);
       }
       
-      // 1. Look for direct secret patterns in binary data FIRST  
-      const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
-      const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
-      
-      // Also look for patterns in the compressed stream content
-      const compressedPatterns = [
-        /[A-Za-z0-9]{20,40}/g,  // Potential encoded secrets
-        /[A-Z0-9]{16,}/g,       // AWS-style keys
-        /[A-Za-z0-9+/=]{30,}/g  // Base64-like strings
-      ];
-      
-      const awsKeys = binaryString.match(awsKeyPattern) || [];
-      const secrets = binaryString.match(secretPattern) || [];
-      
-      // Extract from compressed streams - look for the encoded content
-      let compressedSecrets = [];
-      for (const pattern of compressedPatterns) {
-        const matches = binaryString.match(pattern) || [];
-        compressedSecrets = compressedSecrets.concat(
-          matches.filter(match => 
-            match.length >= 20 && 
-            !match.includes('PDF') && 
-            !match.includes('obj') &&
-            !match.includes('ReportLab') &&
-            /[A-Za-z0-9]/.test(match) // Must contain alphanumeric
-          )
-        );
-      }
-      
-      // PRIORITIZE actual secrets over metadata
-      if (awsKeys.length > 0) {
-        extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
-        logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
-      } else if (secrets.length > 0) {
-        // Filter out short matches and PDF noise
-        const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
-        if (realSecrets.length > 0) {
-          extractedText = realSecrets.join(' '); // Use ONLY the secrets
-          logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
-        }
-      } else if (compressedSecrets.length > 0) {
-        // Only use compressed secrets if no direct secrets found
-        const uniqueSecrets = [...new Set(compressedSecrets)].sort((a, b) => b.length - a.length);
-        // Filter out PDF metadata hashes
-        const filteredSecrets = uniqueSecrets.filter(s => 
-          !s.match(/^[0-9a-f]{32}$/) && // Not MD5 hash
-          !s.includes('f2bee42f') && // Not the known PDF hash
-          s.length >= 15
-        );
+      // Only look for direct patterns if we haven't found secrets in streams
+      if (!extractedText.includes('AKIA')) {
+        // Look for direct secret patterns in binary data
+        const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
+        const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
         
-        if (filteredSecrets.length > 0) {
-          extractedText = filteredSecrets.slice(0, 5).join(' '); // Take top 5
-          logger.debug(`Compressed secrets found: ${filteredSecrets.length} matches`);
+        const awsKeys = binaryString.match(awsKeyPattern) || [];
+        const secrets = binaryString.match(secretPattern) || [];
+        
+        // PRIORITIZE actual secrets over metadata
+        if (awsKeys.length > 0) {
+          extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
+          logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
+        } else if (secrets.length > 0) {
+          // Filter out short matches and PDF noise
+          const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
+          if (realSecrets.length > 0) {
+            extractedText += ' ' + realSecrets.join(' ');
+            logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
+          }
         }
       }
       
@@ -375,15 +349,40 @@ async function extractPDFTextDeterministic(buffer, filename) {
 // ---------------------------------------------------------------------------
 /** Simple regex-based check for AWS access keys and similar patterns */
 function detectSecretsLocally(text) {
+  const findings = [];
+  
+  // AWS Access Key pattern
   const awsKeyPattern = /AKIA[0-9A-Z]{16}/g;
-  const matches = text.match(awsKeyPattern) || [];
-
-  return matches.map(key => ({
-    type: 'Secret',
-    category: 'AWS credentials',
-    value: key,
-    severity: 'high'
-  }));
+  const awsKeys = text.match(awsKeyPattern) || [];
+  
+  // AWS Secret Key pattern
+  const awsSecretPattern = /[A-Za-z0-9+/]{40}[A-Za-z0-9+/=]{0,2}/g;
+  const awsSecrets = text.match(awsSecretPattern) || [];
+  
+  // Add AWS Access Keys
+  awsKeys.forEach(key => {
+    findings.push({
+      type: 'Secret',
+      category: 'AWS Access Key',
+      value: key,
+      severity: 'high'
+    });
+  });
+  
+  // Add AWS Secret Keys (filter out false positives)
+  awsSecrets.forEach(secret => {
+    // Skip if it's just base64 encoded PDF content
+    if (!secret.includes('PDF') && !secret.includes('obj') && !secret.includes('endobj')) {
+      findings.push({
+        type: 'Secret',
+        category: 'AWS Secret Key',
+        value: secret,
+        severity: 'high'
+      });
+    }
+  });
+  
+  return findings;
 }
 
 
@@ -502,67 +501,77 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     // 5.4 Scan the text -------------------------------------------------------
     let scanResults;
 
-    if (extractedText.length < 10) {
-      // No meaningful text extracted
-      logger.info('Insufficient text extracted - treating as safe');
+    // First check for secrets in the raw text
+    const localSecrets = detectSecretsLocally(extractedText);
+    
+    if (localSecrets.length > 0) {
+      logger.info(`Found ${localSecrets.length} secrets locally`);
+      scanResults = {
+        secrets: true,
+        findings: localSecrets,
+        action: 'block',
+        scannedAt: new Date().toISOString(),
+        extractionError: false,
+        safe: false,
+        note: 'Secrets detected in file'
+      };
+      return res.json(scanResults);
+    }
+
+    if (extractedText.length < 10 || pdfParsingFailed) {
+      // No meaningful text extracted or parsing failed - treat as potentially unsafe
+      logger.warn('Insufficient text extracted or parsing failed - treating as potentially unsafe');
       scanResults = {
         secrets: false,
         findings: [],
-        action: 'allow',
+        action: 'warn',
         scannedAt: new Date().toISOString(),
-        note: 'No extractable text content'
+        note: pdfParsingFailed ? 'PDF parsing failed' : 'No extractable text content',
+        extractionError: true,
+        textLength: extractedText.length,
+        safe: false // Explicitly mark as not safe
       };
-    } else {
-      // Send to Prompt Security API (single source of truth)
-      try {
-        logger.info(`Sending ${extractedText.length} characters to Prompt Security API`);
-        scanResults = await promptSecurity.scanText(extractedText);
+      return res.json(scanResults);
+    }
 
-        // Log API assessment
-        logger.info(`API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
-
-      } catch (apiErr) {
-        logger.error('Prompt Security API error:', apiErr.message);
-        
-        // If it's a service unavailability error (503), return scan error
-        if (apiErr.statusCode === 503 || apiErr.message.includes('unavailable')) {
-          return res.status(503).json({
-            error: 'scan_service_unavailable',
-            message: 'Security scanning service is temporarily unavailable. Please try again.',
-            action: 'error',
-            findings: [],
-            scannedAt: new Date().toISOString(),
-            retryable: true
-          });
-        }
-        
-        // For other API errors, still throw to be handled by error middleware
-        throw apiErr;
-      }
-      // ---------------------------------------------------------------
-      // Local secret detection as a safeguard against API false negatives
-      const localFindings = detectSecretsLocally(extractedText);
-      if (localFindings.length > 0) {
-        if (!scanResults.secrets) {
-          logger.warn('Local secret detection found secrets not flagged by API');
-        }
-        scanResults.secrets = true;
-        scanResults.action = 'block';
-        scanResults.findings = (scanResults.findings || []).concat(localFindings);
-      }
+    // Send to Prompt Security API (single source of truth)
+    try {
+      const apiResults = await promptSecurity.scanText(extractedText);
+      
+      scanResults = {
+        ...apiResults,
+        scannedAt: new Date().toISOString(),
+        extractionError: false,
+        safe: !apiResults.secrets // Only mark as safe if no secrets found
+      };
+    } catch (error) {
+      logger.error('Error from Prompt Security API:', error);
+      
+      scanResults = {
+        secrets: false,
+        findings: [],
+        action: 'warn',
+        scannedAt: new Date().toISOString(),
+        note: 'Error scanning content',
+        extractionError: true,
+        safe: false // Explicitly mark as not safe on API error
+      };
     }
 
     // 5.5 Respond -------------------------------------------------------------
     const secretsFound = scanResults.secrets === true;
-    const action = secretsFound ? 'block' : 'allow';
+    const action = secretsFound ? 'block' : (scanResults.action === 'warn' ? 'warn' : 'allow');
     
     // Return the scan result
     res.status(200).json({
       secrets: secretsFound,
-      findings: scanResults.findings,
+      findings: scanResults.findings || [],
       action,
       textLength: extractedText.length,
-      scannedAt: new Date().toISOString()
+      scannedAt: new Date().toISOString(),
+      extractionError: scanResults.extractionError || false,
+      note: scanResults.note,
+      safe: scanResults.safe === true // Explicitly include safe flag
     });
 
     // Store debug metadata in memory
