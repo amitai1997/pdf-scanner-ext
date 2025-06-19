@@ -1,4 +1,7 @@
-/** Express server that extracts PDF text and scans it via Prompt Security before response. */
+/**
+ * Express service that extracts PDF text, scans it,
+ * and returns the security assessment.
+ */
 
 // ---------------------------------------------------------------------------
 // 1. Environment & dependencies

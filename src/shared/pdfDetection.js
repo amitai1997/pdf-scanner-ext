@@ -1,4 +1,7 @@
-/** Library of heuristics for recognising and extracting PDFs from diverse payloads. */
+/**
+ * Heuristics for detecting and extracting PDF data
+ * from various input formats.
+ */
 
 import { PDF_CONSTANTS } from './constants.js';
 

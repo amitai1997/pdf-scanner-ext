@@ -1,4 +1,7 @@
-/** Intercepts web requests to AI endpoints, extracts PDFs, and forwards them for scanning. */
+/**
+ * Intercepts requests to supported endpoints, extracts PDFs,
+ * and sends them to the background scanner.
+ */
 
 // Create a simple logger if not already available
 if (!self.logger) {
@@ -11,7 +14,7 @@ if (!self.logger) {
           console.log(`[PDF Scanner] ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -23,7 +26,7 @@ if (!self.logger) {
           console.warn(`[PDF Scanner] WARNING: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -35,7 +38,7 @@ if (!self.logger) {
           console.error(`[PDF Scanner] ERROR: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     }
   };

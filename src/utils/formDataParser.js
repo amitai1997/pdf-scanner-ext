@@ -1,4 +1,7 @@
-/** Extracts PDFs from multipart or JSON request bodies (20 MB limit enforced). */
+/**
+ * Utility to extract PDF blobs from multipart or JSON bodies.
+ * Enforces a 20MB maximum.
+ */
 
 /**
  * FormData Parser utility class
@@ -332,7 +335,7 @@ if (!self.logger) {
           console.log(`[PDF Scanner] ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -344,7 +347,7 @@ if (!self.logger) {
           console.warn(`[PDF Scanner] WARNING: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -356,7 +359,7 @@ if (!self.logger) {
           console.error(`[PDF Scanner] ERROR: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     }
   };

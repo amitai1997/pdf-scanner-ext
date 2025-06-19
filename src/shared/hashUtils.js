@@ -1,4 +1,7 @@
-/** SHA-256 helper functions that work in both browser and Node.js contexts. */
+/**
+ * SHA-256 helpers usable in both browser and Node.js
+ * environments.
+ */
 
 /**
  * Compute SHA-256 hash of base64 string in browser environment

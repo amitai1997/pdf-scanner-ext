@@ -1,4 +1,7 @@
-/** Content script injected into chat websites; detects PDF uploads and triggers scans. */
+/**
+ * Content script for chat sites.
+ * Detects PDF uploads and sends them for scanning.
+ */
 
 /**
  * Load shared CSS for consistent styling with DOM ready check
@@ -76,7 +79,7 @@ const logger = (() => {
           console.log(`[PDF Scanner] ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -88,7 +91,7 @@ const logger = (() => {
           console.warn(`[PDF Scanner] WARNING: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     
@@ -100,7 +103,7 @@ const logger = (() => {
           console.error(`[PDF Scanner] ERROR: ${message}`);
         }
       } catch (e) {
-        // Silent fail if console is not available
+        // Ignore logging errors
       }
     },
     

@@ -1,4 +1,7 @@
-/** Barrel file exporting shared utilities for both Node and browser builds. */
+/**
+ * Aggregates and re-exports all shared utilities
+ * for Node and browser usage.
+ */
 
 // Constants
 export * from './constants.js';
