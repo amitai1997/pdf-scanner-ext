@@ -1,4 +1,4 @@
-// PDF Scanner Extension - Request Interceptor Service
+/** Intercepts web requests to AI endpoints, extracts PDFs, and forwards them for scanning. */
 
 // Create a simple logger if not already available
 if (!self.logger) {

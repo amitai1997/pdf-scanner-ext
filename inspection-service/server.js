@@ -1,8 +1,4 @@
-/**
- * PDF Scanner Inspection Service – Production Ready
- * Express server that processes PDFs and checks them for secrets without ever
- * returning an HTTP-500 to the browser.
- */
+/** Express server that extracts PDF text and scans it via Prompt Security before response. */
 
 // ---------------------------------------------------------------------------
 // 1. Environment & dependencies

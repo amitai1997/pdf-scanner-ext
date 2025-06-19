@@ -1,7 +1,4 @@
-/**
- * Shared error handling utilities
- * Consolidates error structures and handling for consistent error responses
- */
+/** Domain error classes plus helpers to create consistent JSON responses. */
 
 /**
  * Base application error class

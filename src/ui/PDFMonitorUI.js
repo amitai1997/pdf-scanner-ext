@@ -1,7 +1,4 @@
-/**
- * PDF Monitor UI Components
- * Handles all UI creation and management for the PDF Scanner extension
- */
+/** UI primitives (modals, indicators) injected into host pages by PDF Scanner. */
 
 export class PDFMonitorUI {
   constructor(logger) {

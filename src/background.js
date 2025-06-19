@@ -1,4 +1,4 @@
-// PDF Scanner Extension - Background Service Worker
+/** Chrome service worker that queues PDF scans, maintains stats and orchestrates messaging. */
 
 // Create a logger for the background script
 const logger = {

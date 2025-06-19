@@ -1,7 +1,4 @@
-/**
- * Shared constants for PDF Scanner Extension
- * Centralized place for all constants to avoid duplication
- */
+/** Immutable constants shared between browser scripts and the inspection service. */
 
 export const PDF_CONSTANTS = {
   // File size limits

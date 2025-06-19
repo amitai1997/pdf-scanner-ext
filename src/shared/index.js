@@ -1,7 +1,4 @@
-/**
- * Shared utilities index
- * Central export for all shared modules
- */
+/** Barrel file exporting shared utilities for both Node and browser builds. */
 
 // Constants
 export * from './constants.js';

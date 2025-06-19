@@ -1,7 +1,4 @@
-/**
- * Shared logging utilities
- * Isomorphic logger that works in both browser and Node.js environments
- */
+/** Isomorphic logger with colour, level filtering and Node/Browser adaptation. */
 
 const LOG_LEVELS = {
   error: 0,

@@ -1,7 +1,4 @@
-/**
- * Logger utility for PDF Scanner Inspection Service
- * Provides structured logging with different levels and proper formatting
- */
+/** Lightweight console logger with level filtering for the inspection service. */
 
 const LOG_LEVELS = {
   error: 0,
