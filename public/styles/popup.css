@@ -8,9 +8,9 @@
 body {
   width: 320px;
   min-height: 200px;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  color: #1e293b;
+  font-family: var(--pdf-scanner-font-family);
+  background: linear-gradient(135deg, var(--pdf-scanner-neutral-light) 0%, #f1f5f9 100%);
+  color: var(--pdf-scanner-text);
   line-height: 1.5;
 }
 
@@ -25,14 +25,14 @@ body {
   justify-content: space-between;
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--pdf-scanner-neutral-border);
 }
 
 .header h1 {
   font-size: 18px;
   font-weight: 700;
   margin: 0;
-  color: #0f172a;
+  color: var(--pdf-scanner-text);
   letter-spacing: -0.025em;
 }
 
@@ -40,19 +40,19 @@ body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background-color: #cbd5e1;
+  background-color: var(--pdf-scanner-neutral-border);
   transition: background-color 0.2s ease;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #e2e8f0;
+  box-shadow: 0 0 0 2px var(--pdf-scanner-white), 0 0 0 3px var(--pdf-scanner-neutral-border);
 }
 
 .status-indicator.active {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #a7f3d0;
+  background: linear-gradient(135deg, var(--pdf-scanner-success) 0%, var(--pdf-scanner-success-text) 100%);
+  box-shadow: 0 0 0 2px var(--pdf-scanner-white), 0 0 0 3px var(--pdf-scanner-success-border);
 }
 
 .status-indicator.inactive {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #fecaca;
+  background: linear-gradient(135deg, var(--pdf-scanner-error) 0%, var(--pdf-scanner-error-text) 100%);
+  box-shadow: 0 0 0 2px var(--pdf-scanner-white), 0 0 0 3px var(--pdf-scanner-error-border);
 }
 
 .status-container {
@@ -60,13 +60,13 @@ body {
   padding: 16px;
   background: rgba(255, 255, 255, 0.7);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--pdf-scanner-neutral-border);
   backdrop-filter: blur(10px);
 }
 
 .status-text {
   font-size: 13px;
-  color: #64748b;
+  color: var(--pdf-scanner-text-muted);
   margin-bottom: 8px;
   font-weight: 500;
 }
@@ -74,25 +74,25 @@ body {
 .scan-counter {
   font-size: 24px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--pdf-scanner-text);
   letter-spacing: -0.02em;
 }
 
 .divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, var(--pdf-scanner-neutral-border) 50%, transparent 100%);
   margin: 20px 0;
 }
 
 .footer {
   margin-top: 20px;
   font-size: 12px;
-  color: #64748b;
+  color: var(--pdf-scanner-text-muted);
 }
 
 .powered-by {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--pdf-scanner-neutral);
   text-align: center;
   margin-top: 12px;
   font-weight: 500;
@@ -102,7 +102,7 @@ body {
 /* Hover effects */
 .status-container:hover {
   background: rgba(255, 255, 255, 0.9);
-  border-color: #cbd5e1;
+  border-color: var(--pdf-scanner-neutral-border);
   transform: translateY(-1px);
   transition: all 0.2s ease;
 }
@@ -115,7 +115,7 @@ body {
   }
 
   .header {
-    border-bottom-color: #334155;
+    border-bottom-color: var(--pdf-scanner-neutral-border);
   }
 
   .header h1 {
