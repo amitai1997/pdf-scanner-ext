@@ -167,22 +167,73 @@ pdf-scanner-ext/
 ├── inspection-service/          # Backend service
 │   ├── server.js               # Express server
 │   ├── middleware/             # Express middleware
+│   │   └── errorHandler.js     # Global error handling
 │   ├── services/               # External service clients
+│   │   └── promptSecurityClient.js # Prompt Security API client
 │   └── utils/                  # Utility functions
+│       └── logger.js           # Server-side logging
 ├── src/                        # Extension source
 │   ├── background.js           # Service worker
-│   ├── content/index.js              # Content script
-│   ├── popup.js                # Popup controller
-│   ├── shared/                 # Shared utilities
-│   └── utils/                  # Extension utilities
-├── public/                     # Static assets
-│   ├── popup.html              # Extension popup
-│   ├── icons/                  # Extension icons
-│   └── styles/                 # CSS files
-├── manifest.json               # Extension manifest
-├── docker-compose.yml          # Docker configuration
-└── README.md                   # This file
+│   ├── content/                # Content scripts (loaded in order)
+│   │   ├── index.js           # Main content script entry point
+│   │   ├── logger.js          # Content script logging
+│   │   ├── constants.js       # Content script constants
+│   │   ├── domHelpers.js      # DOM manipulation utilities
+│   │   ├── xhrFetchInterceptor.js # HTTP request interception
+│   │   ├── watchers.js        # File upload monitoring
+│   │   ├── ui.js              # UI component exports
+│   │   └── pdfMonitor.js      # Main PDF monitoring class
+│   ├── popup.js               # Popup controller
+│   ├── shared/                # Shared utilities
+│   │   ├── constants.js       # Global constants
+│   │   ├── logger.js          # Universal logging class
+│   │   ├── pdfDetection.js    # PDF detection heuristics
+│   │   ├── hashUtils.js       # File hashing utilities
+│   │   ├── errors.js          # Error handling classes
+│   │   └── index.js           # Shared exports
+│   ├── ui/                    # UI Components
+│   │   └── PDFMonitorUI.js    # Main UI class for indicators/modals
+│   └── utils/                 # Extension utilities
+│       ├── formDataParser.js  # Form data parsing
+│       └── interceptor.js     # Request interception helpers
+├── public/                    # Static assets
+│   ├── popup.html            # Extension popup
+│   ├── icons/                # Extension icons
+│   │   ├── icon.svg         # Vector icon
+│   │   └── icon16.png       # 16px icon
+│   └── styles/               # CSS files
+│       ├── popup.css        # Popup styling
+│       └── shared-themes.css # Shared UI themes
+├── manifest.json             # Extension manifest (Manifest V3)
+├── docker-compose.yml        # Docker configuration
+├── eslint.config.js          # ESLint configuration
+├── jsconfig.json             # JavaScript project config
+└── README.md                 # This file
 ```
+
+---
+
+## Technical Architecture
+
+### Content Script Loading
+
+The extension uses traditional script loading instead of ES6 modules for maximum browser compatibility. Scripts are loaded in a specific order via `manifest.json`:
+
+1. **Shared dependencies** (`constants.js`, `logger.js`) - Global utilities
+2. **Content utilities** (`logger.js`, `constants.js`, `domHelpers.js`) - Content-specific helpers  
+3. **Core functionality** (`xhrFetchInterceptor.js`, `watchers.js`) - Upload monitoring
+4. **UI components** (`PDFMonitorUI.js`, `ui.js`) - User interface
+5. **Main logic** (`pdfMonitor.js`, `index.js`) - Core PDF monitoring class and entry point
+
+This approach ensures all dependencies are available globally before dependent code executes, avoiding module loading issues in Chrome extensions.
+
+### Key Components
+
+- **PDFMonitor**: Main class that orchestrates PDF detection and scanning
+- **Watchers**: Functions that monitor various upload methods (drag & drop, file inputs, etc.)
+- **XHR/Fetch Interceptor**: Captures HTTP requests containing PDF data
+- **PDFMonitorUI**: Handles all user interface elements (indicators, modals, warnings)
+- **Shared utilities**: Common functions used across extension and service
 
 ---
 
@@ -219,20 +270,23 @@ pdf-scanner-ext/
 
 ### Current Limitations
 
-- **Browser Support**: Tested only on Chrome (Manifest V3)
-- **File Size**: Maximum 20MB per PDF (configurable)
-- **API Dependency**: Requires active Prompt Security API connection
+- **Browser Support**: Chrome only (Manifest V3) - uses traditional script loading for compatibility
+- **File Size**: Maximum 20MB per PDF (configurable in constants)
+- **API Dependency**: Requires active Prompt Security API connection for scanning
 - **Text Extraction**: Some PDF formats may not extract text properly
 - **Language Support**: Best results with English content
-- **Performance**: Large PDFs may cause brief UI freezing
+- **Module System**: Uses traditional script loading instead of ES6 modules for Chrome extension compatibility
+- **Performance**: Large PDFs may cause brief UI freezing during processing
 
 ### Planned Improvements
 
-- [ ] Firefox support
-- [ ] Offline scanning capability
+- [ ] Firefox support (requires ES6 module conversion)
+- [ ] Offline scanning capability  
 - [ ] Support for other file types (DOCX, TXT)
 - [ ] Bulk scanning interface
 - [ ] Custom detection rules
+- [x] **Content script compatibility** - Converted from ES6 modules to traditional loading
+- [x] **Improved error handling** - Fixed undefined reference errors and UI method calls
 
 ---
 
