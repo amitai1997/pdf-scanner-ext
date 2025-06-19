@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@shared": ["src/shared/index.js"],
+      "@utils/*": ["src/utils/*"],
+      "@public/*": ["public/*"]
+    },
+
+  },
+  "include": [
+    "src/**/*",
+    "public/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "inspection-service/node_modules",
+    "dist",
+    "build"
+  ]
+} 
