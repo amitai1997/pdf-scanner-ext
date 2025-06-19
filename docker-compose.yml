@@ -20,9 +20,6 @@ services:
       - NODE_ENV=development
       - INSPECTION_PORT=3001
       - PORT=3001
-      # Prompt Security API configuration (optional - set these in .env)
-      - PROMPT_SECURITY_APP_ID=${PROMPT_SECURITY_APP_ID:-}
-      - PROMPT_SECURITY_API_KEY=${PROMPT_SECURITY_API_KEY:-}
     volumes:
       # Mount source code for hot-reload during development
       - ./inspection-service:/app:cached

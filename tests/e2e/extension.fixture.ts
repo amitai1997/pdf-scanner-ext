@@ -26,8 +26,10 @@ export const test = base.extend<{
         `--disable-extensions-except=${EXT_PATH}`,
         `--load-extension=${EXT_PATH}`,
       ],
+      headless: false,
     });
 
+    // Hook up logging
     context.on('page', hookLogs);
     context.on('serviceworker', hookLogs);
     context.serviceWorkers().forEach(hookLogs);
@@ -40,16 +42,56 @@ export const test = base.extend<{
   },
 
   extensionId: async ({ context }, use) => {
-    const [sw] = context.serviceWorkers();
-    const id = sw.url().split('/')[2];
-    await use(id);
+    let extensionId: string | undefined;
+    
+    // Wait for the extension to be loaded
+    const timeout = setTimeout(() => {
+      throw new Error('Timeout waiting for extension to load');
+    }, 30000);
+    
+    while (!extensionId) {
+      const workers = context.serviceWorkers();
+      const extensionWorker = workers.find(worker => 
+        worker.url().includes('chrome-extension://')
+      );
+      
+      if (extensionWorker) {
+        extensionId = extensionWorker.url().split('/')[2];
+        break;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    clearTimeout(timeout);
+    
+    if (!extensionId) {
+      throw new Error('Could not find extension ID');
+    }
+    
+    // Create a page to initialize the extension
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/public/popup.html`);
+    await page.waitForLoadState('domcontentloaded');
+    await page.close();
+    
+    await use(extensionId);
   },
 
   reloadExt: async ({ context }, use) => {
     await use(async () => {
-      const [sw] = context.serviceWorkers();
-      await sw.evaluate(() => chrome.runtime.reload());
-      await context.waitForEvent('serviceworker');
+      const workers = context.serviceWorkers();
+      const extensionWorker = workers.find(worker => 
+        worker.url().includes('chrome-extension://')
+      );
+      
+      if (extensionWorker) {
+        await extensionWorker.evaluate(() => {
+          // @ts-ignore
+          chrome.runtime.reload();
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     });
   },
 });
