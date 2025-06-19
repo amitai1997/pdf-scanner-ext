@@ -1,6 +1,5 @@
 /**
- * Unit tests for shared utilities
- * These tests verify the consolidated utilities work correctly
+ * Unit tests for the shared utility modules.
  */
 
 import { 

@@ -1,4 +1,7 @@
-/** Popup script showing scanner status and statistics to the user. */
+/**
+ * Controls the extension popup and displays
+ * scanner status and statistics.
+ */
 
 // Create a logger for the popup
 const logger = {
@@ -10,7 +13,7 @@ const logger = {
         console.log(`[PDF Scanner Popup] ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   },
 
@@ -22,7 +25,7 @@ const logger = {
         console.warn(`[PDF Scanner Popup] WARNING: ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   },
 
@@ -34,7 +37,7 @@ const logger = {
         console.error(`[PDF Scanner Popup] ERROR: ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   }
 };

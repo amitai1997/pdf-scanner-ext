@@ -1,4 +1,7 @@
-/** Library of heuristics for recognising and extracting PDFs from diverse payloads. */
+/**
+ * Heuristics for detecting and extracting PDF data
+ * from various input formats.
+ */
 
 // PDF_CONSTANTS is loaded via manifest.json script order
 

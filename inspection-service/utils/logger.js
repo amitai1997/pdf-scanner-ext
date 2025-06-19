@@ -1,4 +1,7 @@
-/** Lightweight console logger with level filtering for the inspection service. */
+/**
+ * Console logger used by the inspection service.
+ * Supports basic level filtering.
+ */
 
 const LOG_LEVELS = {
   error: 0,
