@@ -327,12 +327,11 @@ async function extractPDFTextDeterministic(buffer, filename) {
         numpages: 0,
         parseError: true
       };
-      
-      // Cache even the error result to ensure consistency
-      pdfParseCache.set(cacheKey, errorResult);
+
+      // Do not cache parse failures to avoid persistent false negatives
       resolveParsePromise(errorResult);
-      logger.warn(`Cached error result for ${filename}: no extractable text`);
-      
+      logger.warn(`Parse failed for ${filename}: no extractable text`);
+
       return errorResult;
     }
     
@@ -358,10 +357,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
       parseError: true
     };
     
-    // Cache the error result to ensure consistency
-    pdfParseCache.set(cacheKey, errorResult);
-    logger.warn(`Cached error result for ${filename}: ${error.message}`);
-    
+    // Do not cache error results to avoid stale failures
+    logger.warn(`Parse error for ${filename}: ${error.message}`);
+
     // Resolve with error result instead of rejecting
     resolveParsePromise(errorResult);
     
