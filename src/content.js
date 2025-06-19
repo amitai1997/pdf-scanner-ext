@@ -1459,8 +1459,14 @@ class PDFMonitor {
     } catch (error) {
       logger.error('Error scanning PDF immediately:', error);
       
-      // Handle context invalidated errors specially
-      if (error.message.includes('Extension context') || 
+      // Handle specific error types
+      if (error.message.includes('Scanning service temporarily unavailable') || 
+          error.message.includes('Scanning service unavailable')) {
+        this.showScanErrorIndicator(
+          file.name,
+          'Security scanning service is temporarily unavailable. Please try uploading again in a moment.'
+        );
+      } else if (error.message.includes('Extension context') || 
           error.message.includes('invalidated') || 
           error.message.includes('unavailable')) {
         this.showScanErrorIndicator(
@@ -1469,7 +1475,7 @@ class PDFMonitor {
         );
       } else {
         // For other errors, show a generic scan error
-        this.showScanErrorIndicator(file.name);
+        this.showScanErrorIndicator(file.name, `Scan error: ${error.message}`);
       }
       
       throw error;
