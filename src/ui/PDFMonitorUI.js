@@ -1,6 +1,9 @@
-/** UI primitives (modals, indicators) injected into host pages by PDF Scanner. */
+/**
+ * Provides modals and indicators injected
+ * into host pages by the PDF Scanner.
+ */
 
-export class PDFMonitorUI {
+class PDFMonitorUI {
   constructor(logger) {
     this.logger = logger;
     this._currentEscHandler = null;
@@ -412,7 +415,7 @@ export class PDFMonitorUI {
  * Show a standalone error message (used outside of class context)
  * @param {string} message - Error message to show
  */
-export function showStandaloneError(message) {
+function showStandaloneError(message) {
   try {
     const indicatorEl = document.createElement('div');
     indicatorEl.id = 'pdf-scanner-indicator';

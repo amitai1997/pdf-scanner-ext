@@ -1,4 +1,7 @@
-/** Domain error classes plus helpers to create consistent JSON responses. */
+/**
+ * Custom error classes and helpers for building
+ * consistent JSON responses.
+ */
 
 /**
  * Base application error class

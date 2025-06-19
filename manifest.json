@@ -42,7 +42,18 @@
         "https://*.claude.ai/*",
         "https://*.anthropic.com/*"
       ],
-      "js": ["src/content.js"],
+      "js": [
+        "src/shared/constants.js",
+        "src/shared/logger.js",
+        "src/content/logger.js",
+        "src/content/constants.js",
+        "src/content/domHelpers.js",
+        "src/content/xhrFetchInterceptor.js",
+        "src/content/watchers.js",
+        "src/ui/PDFMonitorUI.js",
+        "src/content/pdfMonitor.js",
+        "src/content/index.js"
+      ],
       "run_at": "document_start"
     }
   ],
