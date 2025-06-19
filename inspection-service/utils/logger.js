@@ -124,6 +124,17 @@ class Logger {
       this.info(message, { secretsFound: false });
     }
   }
+
+  /**
+   * Log structured PDF debug information
+   * @param {object} data - Debug metadata
+   */
+  debugPDF(data) {
+    if (this.level >= LOG_LEVELS.debug) {
+      console.log(this.formatMessage('debug', 'PDF Debug Entry'));
+      console.table(data);
+    }
+  }
 }
 
 // Create default logger instance

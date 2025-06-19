@@ -13,6 +13,7 @@ const fs        = require('fs');
 const path      = require('path');
 const pdfParse  = require('pdf-parse'); // pdf-parse@^3.0.0 / pdfjs-dist@^4
 const ascii85   = require('ascii85');
+const crypto    = require('crypto');
 
 // Internal modules
 const { errorHandler, AppError } = require('./middleware/errorHandler');
@@ -32,6 +33,21 @@ const app            = express();
 // Add a cache for PDF parsing results at the top level
 const pdfParseCache = new Map();
 const pdfParsePromises = new Map(); // Cache for ongoing parsing promises
+// In-memory debug cache (LRU up to 10 entries)
+const debugCache = new Map();
+const debugStats = { processed: 0, failures: 0 };
+
+function addDebugEntry(hash, data) {
+  debugCache.set(hash, data);
+  debugStats.processed += 1;
+  if (data.parseStrategy === 'fallback') {
+    debugStats.failures += 1;
+  }
+  while (debugCache.size > 10) {
+    const oldestKey = debugCache.keys().next().value;
+    debugCache.delete(oldestKey);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 3. Utilities
@@ -401,6 +417,29 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Development-only debug endpoints
+if (NODE_ENV === 'development') {
+  app.get('/debug/cache', (_req, res) => {
+    const entries = Array.from(debugCache.values());
+    res.json(entries);
+  });
+
+  app.get('/debug/cache/:hash', (req, res) => {
+    const entry = debugCache.get(req.params.hash);
+    if (!entry) return res.status(404).json({ error: 'not_found' });
+    res.json(entry);
+  });
+
+  app.get('/debug/stats', (_req, res) => {
+    res.json({ ...debugStats, cacheSize: debugCache.size });
+  });
+
+  app.delete('/debug/cache', (_req, res) => {
+    debugCache.clear();
+    res.json({ cleared: true });
+  });
+}
+
 // Main scan endpoint
 app.post('/scan', upload.single('pdf'), async (req, res, next) => {
   try {
@@ -424,13 +463,9 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       });
     }
 
-    // 5.2 Optional debug dump -------------------------------------------------
-    if (NODE_ENV === 'development') {
-      const debugDir = path.join(__dirname, 'debug');
-      if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir);
-      const safeName  = filename.replace(/[^a-zA-Z0-9]/g, '_');
-      fs.writeFileSync(path.join(debugDir, `debug_${Date.now()}_${safeName}`), buffer);
-    }
+    // 5.2 In-memory debug log -------------------------------------------------
+    const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const requestStart = Date.now();
 
     // 5.3 Parse the PDF (with deterministic results) -----------------------------------------
     let extractedText = '';
@@ -507,6 +542,24 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       textLength: extractedText.length,
       scannedAt: new Date().toISOString()
     });
+
+    // Store debug metadata in memory
+    if (NODE_ENV === 'development') {
+      const duration = Date.now() - requestStart;
+      const debugEntry = {
+        hash: fileHash,
+        filename,
+        size,
+        mimetype,
+        parseStrategy: pdfParsingFailed ? 'fallback' : 'standard',
+        textPreview: extractedText.slice(0, 200),
+        timestamp: new Date().toISOString(),
+        duration,
+        action
+      };
+      addDebugEntry(fileHash, debugEntry);
+      logger.debugPDF(debugEntry);
+    }
   } catch (err) {
     next(err);
   }
@@ -531,4 +584,7 @@ app.listen(PORT, () => {
   logger.info(`Environment: ${NODE_ENV}`);
   logger.info(`Started at: ${new Date().toISOString()}`);
   logger.info('API Endpoints available: GET /health, POST /scan');
+  if (NODE_ENV === 'development') {
+    logger.info('Debug Endpoints: GET /debug/cache, GET /debug/cache/:hash, GET /debug/stats, DELETE /debug/cache');
+  }
 });
