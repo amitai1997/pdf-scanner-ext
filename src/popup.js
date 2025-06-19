@@ -1,4 +1,4 @@
-// PDF Scanner Popup
+/** Popup script showing scanner status and statistics to the user. */
 
 // Create a logger for the popup
 const logger = {

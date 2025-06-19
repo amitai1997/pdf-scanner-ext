@@ -67,10 +67,10 @@ A Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, 
 | File                            | Runtime context    | What it does                                                                                                                                               |
 |---------------------------------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **background.js**               | Service-worker     | Orchestrates scans: receives PDFs, POSTs them to the backend, stores daily counters in `chrome.storage`, throttles duplicate scans, and shows desktop + in-page notifications. |
-| **content.js**                  | Content script     | Watches  P the page for file uploads, drag-drops, clipboard pastes, XHR/`fetch` bodies; flags PDFs, requests scans, and overlays a warning banner if secrets are found. |
+| **content.js**                  | Content script     | Watches the page for file uploads, drag-drops, clipboard pastes, XHR/`fetch` bodies; flags PDFs, requests scans, and overlays a warning banner if secrets are found. |
 | **popup.js**                    | Popup UI           | Controller for `popup.html`; shows Active/Inactive state, daily scan count, last-scan time, and a DEV badge for non-production builds.                    |
 | **utils/formDataParser.js**     | Shared (SW + content + interceptor) | Extracts a PDF from any request body (multipart, base64 JSON blob, nested `file` object) and enforces the 20 MB limit.                       |
-| **utils/interceptor.js**        | Shared, initialised by the service-worker |  PAdds Chrome `webRequest` listeners for AI-site endpoints. When it sees an outgoing POST containing a PDF, it extracts the file (via `FormDataParser`) and passes it to the service-worker. |
+| **utils/interceptor.js**        | Shared, initialised by the service-worker | Adds Chrome `webRequest` listeners for AI-site endpoints. When it sees an outgoing POST containing a PDF, it extracts the file (via `FormDataParser`) and passes it to the service-worker. |
 
 ---
 ![General Architecture](public/sequence_diagram.png)

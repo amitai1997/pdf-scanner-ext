@@ -1,7 +1,4 @@
-/**
- * Shared hash utilities
- * Consolidates hashing logic for both browser and Node.js environments
- */
+/** SHA-256 helper functions that work in both browser and Node.js contexts. */
 
 /**
  * Compute SHA-256 hash of base64 string in browser environment

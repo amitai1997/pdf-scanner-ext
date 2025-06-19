@@ -1,6 +1,4 @@
-/**
- * Global error handler for the PDF inspection service
- */
+/** Express middleware that logs errors and sends a JSON envelope; exports AppError. */
 
 const logger = require('../utils/logger');
 

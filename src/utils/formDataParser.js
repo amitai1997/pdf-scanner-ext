@@ -1,7 +1,4 @@
-/**
- * PDF Scanner Extension - FormData Parser
- * Utility functions to extract PDF data from multipart/form-data requests
- */
+/** Extracts PDFs from multipart or JSON request bodies (20 MB limit enforced). */
 
 /**
  * FormData Parser utility class

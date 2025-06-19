@@ -1,7 +1,4 @@
-/**
- * Shared PDF detection utilities
- * Consolidates PDF detection logic to avoid duplication
- */
+/** Library of heuristics for recognising and extracting PDFs from diverse payloads. */
 
 import { PDF_CONSTANTS } from './constants.js';
 

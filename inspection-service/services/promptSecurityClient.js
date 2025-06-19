@@ -1,6 +1,4 @@
-/**
- * Client for interacting with the Prompt Security API
- */
+/** Resilient client for Prompt Security protect API (retry, timeout, response mapping). */
 
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');

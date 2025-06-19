@@ -1,5 +1,4 @@
-// PDF Scanner Extension - Content Script
-// This runs in the context of AI chat websites to monitor for PDF uploads
+/** Content script injected into chat websites; detects PDF uploads and triggers scans. */
 
 /**
  * Load shared CSS for consistent styling with DOM ready check
