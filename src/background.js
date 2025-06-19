@@ -442,10 +442,21 @@ class PDFScannerBackground {
       });
       
       if (!response.ok) {
+        // Check if it's a service unavailability error
+        if (response.status === 503) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`Scanning service temporarily unavailable: ${errorData.message || 'Please try again in a moment'}`);
+        }
         throw new Error(`API responded with ${response.status}: ${response.statusText}`);
       }
-      
+
       const result = await response.json();
+      
+      // Check if the result indicates a scan error
+      if (result.error === 'scan_service_unavailable') {
+        throw new Error(`Scanning service unavailable: ${result.message}`);
+      }
+      
       logger.log(`Scan completed for: ${filename} (ID: ${scanId}), secrets: ${result.secrets}`);
       
       return result;

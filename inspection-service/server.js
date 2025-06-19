@@ -480,16 +480,22 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         logger.info(`API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
         
       } catch (apiErr) {
-        logger.warn('Prompt Security API unavailable – allowing upload:', apiErr.message);
+        logger.error('Prompt Security API error:', apiErr.message);
         
-        // Graceful fallback: Allow upload when API is unavailable
-        scanResults = {
-          secrets: false,
-          findings: [],
-          action: 'allow',
-          scannedAt: new Date().toISOString(),
-          note: 'API unavailable - upload permitted'
-        };
+        // If it's a service unavailability error (503), return scan error
+        if (apiErr.statusCode === 503 || apiErr.message.includes('unavailable')) {
+          return res.status(503).json({
+            error: 'scan_service_unavailable',
+            message: 'Security scanning service is temporarily unavailable. Please try again.',
+            action: 'error',
+            findings: [],
+            scannedAt: new Date().toISOString(),
+            retryable: true
+          });
+        }
+        
+        // For other API errors, still throw to be handled by error middleware
+        throw apiErr;
       }
     }
 

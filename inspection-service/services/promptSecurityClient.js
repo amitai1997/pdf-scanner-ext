@@ -95,16 +95,10 @@ class PromptSecurityClient {
       }
     }
 
-    // If we get here, all attempts failed - gracefully allow
-    logger.warn('Prompt Security API unavailable - allowing upload');
-    return {
-      secrets: false,
-      findings: [],
-      action: 'allow',
-      scannedAt: new Date().toISOString(),
-      note: 'API unavailable - upload permitted',
-      error: `API unavailable: ${lastError?.message}`
-    };
+    // If we get here, all attempts failed - throw error instead of defaulting to allow
+    // This prevents false negatives where files with secrets are incorrectly marked as clean
+    logger.error('Prompt Security API completely unavailable after all retries');
+    throw new AppError(`Security scanning service unavailable: ${lastError?.message}`, 503);
   }
 
   /**
