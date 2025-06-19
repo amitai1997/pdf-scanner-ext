@@ -186,6 +186,35 @@ pdf-scanner-ext/
 
 ---
 
+## Production Readiness
+
+1. **Package & Sign**
+   - Build extension with deterministic process
+   - Review manifest permissions and origins
+   - Package for Chrome Web Store submission
+
+2. **Deploy Backend**
+   - Configure production environment and secrets
+   - Set up HTTPS with valid certificates
+   - Enable monitoring and health checks
+
+3. **Testing Pipeline**
+   - Implement core test suite (≥85% coverage)
+   - Set up CI/CD for automated checks
+   - Configure automated deployment
+
+4. **Security Review**
+   - Complete manual extension testing
+   - Run dependency vulnerability scans
+   - Verify no hardcoded secrets
+
+5. **Launch & Monitor**
+   - Publish to Chrome Web Store
+   - Deploy backend to production
+   - Monitor 24h post-release
+
+---
+
 ## Limitations
 
 ### Current Limitations
