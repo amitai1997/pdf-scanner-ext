@@ -1,49 +1,178 @@
 // PDF Scanner Extension - Content Script
 // This runs in the context of AI chat websites to monitor for PDF uploads
 
-// Create a logger for the content script (since content scripts can't import modules directly)
-const logger = {
-  log(message, data) {
-    try {
-      if (data !== undefined) {
-        console.log(`[PDF Scanner] ${message}`, data);
-      } else {
-        console.log(`[PDF Scanner] ${message}`);
+/**
+ * Load shared CSS for consistent styling with DOM ready check
+ */
+function loadSharedCSS() {
+  try {
+    // Check if DOM is ready and head exists
+    if (!document || !document.head) {
+      // If DOM isn't ready, wait for it
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadSharedCSS);
+        return;
       }
-    } catch (e) {
-      // Silent fail if console is not available
-    }
-  },
-  
-  warn(message, data) {
-    try {
-      if (data !== undefined) {
-        console.warn(`[PDF Scanner] WARNING: ${message}`, data);
-      } else {
-        console.warn(`[PDF Scanner] WARNING: ${message}`);
+      // Still no head? Try body as fallback
+      if (!document.head && document.body) {
+        console.warn('[PDF Scanner] document.head not available, using body');
+        loadSharedCSSToBody();
+        return;
       }
-    } catch (e) {
-      // Silent fail if console is not available
+      console.warn('[PDF Scanner] Cannot load shared CSS - DOM not ready');
+      return;
     }
-  },
-  
-  error(message, data) {
-    try {
-      if (data !== undefined) {
-        console.error(`[PDF Scanner] ERROR: ${message}`, data);
-      } else {
-        console.error(`[PDF Scanner] ERROR: ${message}`);
-      }
-    } catch (e) {
-      // Silent fail if console is not available
-    }
-  }
-};
 
-// Constants
-const SCAN_TIMEOUT = 10000; // 10 seconds
-const NOTIFICATION_DURATION = 5000; // 5 seconds
-const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20MB
+    // Check if already loaded
+    if (document.getElementById('pdf-scanner-shared-css')) {
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.id = 'pdf-scanner-shared-css';
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('public/styles/shared-themes.css');
+    document.head.appendChild(link);
+  } catch (error) {
+    console.warn('[PDF Scanner] Error loading shared CSS:', error);
+    // Continue without CSS - extension should still work
+  }
+}
+
+/**
+ * Fallback: Load CSS to body if head isn't available
+ */
+function loadSharedCSSToBody() {
+  try {
+    if (!document.body || document.getElementById('pdf-scanner-shared-css')) {
+      return;
+    }
+    
+    const link = document.createElement('link');
+    link.id = 'pdf-scanner-shared-css';
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('public/styles/shared-themes.css');
+    document.body.appendChild(link);
+  } catch (error) {
+    console.warn('[PDF Scanner] Error loading shared CSS to body:', error);
+  }
+}
+
+// Load shared CSS with proper timing
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadSharedCSS);
+} else {
+  loadSharedCSS();
+}
+
+// Create a logger with shared utilities integration
+const logger = (() => {
+  // Fallback logger implementation 
+  const fallbackLogger = {
+    log(message, data) {
+      try {
+        if (data !== undefined) {
+          console.log(`[PDF Scanner] ${message}`, data);
+        } else {
+          console.log(`[PDF Scanner] ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    warn(message, data) {
+      try {
+        if (data !== undefined) {
+          console.warn(`[PDF Scanner] WARNING: ${message}`, data);
+        } else {
+          console.warn(`[PDF Scanner] WARNING: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    error(message, data) {
+      try {
+        if (data !== undefined) {
+          console.error(`[PDF Scanner] ERROR: ${message}`, data);
+        } else {
+          console.error(`[PDF Scanner] ERROR: ${message}`);
+        }
+      } catch (e) {
+        // Silent fail if console is not available
+      }
+    },
+    
+    info(message, data) { this.log(message, data); },
+    debug(message, data) { this.log(message, data); }
+  };
+
+  // Try to use shared logger approach if available
+  try {
+    // For now, use the fallback but with improved formatting
+    return {
+      log: fallbackLogger.log,
+      info: fallbackLogger.info,
+      warn: fallbackLogger.warn,
+      error: fallbackLogger.error,
+      debug: fallbackLogger.debug
+    };
+  } catch (e) {
+    return fallbackLogger;
+  }
+})();
+
+// Import shared constants - with fallbacks for safety
+let PDF_CONSTANTS, UI_CONSTANTS;
+try {
+  // Note: Dynamic import since content scripts have module loading limitations
+  PDF_CONSTANTS = {
+    MAX_PDF_SIZE: 20 * 1024 * 1024, // 20MB
+    SCAN_TIMEOUT: 10000, // 10 seconds
+    NOTIFICATION_DURATION: 5000, // 5 seconds
+    PDF_MIME_TYPES: [
+      'application/pdf',
+      'application/x-pdf',
+      'application/acrobat',
+      'application/vnd.pdf',
+    ]
+  };
+  
+  UI_CONSTANTS = {
+    Z_INDEX: {
+      WARNING_MODAL: 10000,
+      INDICATOR: 9999,
+      ATTACHMENT_WARNING: 1000,
+    },
+    COLORS: {
+      ERROR: '#d32f2f',
+      WARNING: '#ffc107',
+      SUCCESS: '#4caf50',
+      INFO: '#2196f3',
+      GRAY: '#f8f9fa',
+      TEXT: '#333',
+    }
+  };
+} catch (e) {
+  // Fallback constants if shared import fails
+  PDF_CONSTANTS = {
+    MAX_PDF_SIZE: 20 * 1024 * 1024,
+    SCAN_TIMEOUT: 10000,
+    NOTIFICATION_DURATION: 5000,
+    PDF_MIME_TYPES: ['application/pdf', 'application/x-pdf', 'application/acrobat', 'application/vnd.pdf']
+  };
+  UI_CONSTANTS = {
+    Z_INDEX: { WARNING_MODAL: 10000, INDICATOR: 9999, ATTACHMENT_WARNING: 1000 },
+    COLORS: { ERROR: '#d32f2f', WARNING: '#ffc107', SUCCESS: '#4caf50', INFO: '#2196f3', GRAY: '#f8f9fa', TEXT: '#333' }
+  };
+}
+
+// Legacy constants for backward compatibility
+const SCAN_TIMEOUT = PDF_CONSTANTS.SCAN_TIMEOUT;
+const NOTIFICATION_DURATION = PDF_CONSTANTS.NOTIFICATION_DURATION;
+const MAX_PDF_SIZE = PDF_CONSTANTS.MAX_PDF_SIZE;
 
 // Log that content script has loaded
 logger.log(`Content script loaded on ${window.location.href}`);
@@ -200,45 +329,83 @@ class PDFMonitor {
   
   /**
    * Static method to check if a request body contains a PDF
+   * Uses shared PDF detection logic with fallback
    * @param {any} body - Request body
    * @returns {boolean} - Whether the body likely contains a PDF
    */
   static checkIfBodyContainsPDF(body) {
     try {
-      // Handle different body types
-      if (!body) return false;
-      
-      // If it's a string, check for PDF indicators
-      if (typeof body === 'string') {
-        return body.includes('application/pdf') || 
-               body.includes('.pdf') || 
-               body.includes('%PDF-') ||
-               body.includes('data:application/pdf');
-      }
-      
-      // If it's FormData, try to check its entries
-      if (body instanceof FormData) {
-        let hasPDF = false;
-        body.forEach((value, key) => {
-          if (value instanceof File && 
-             (value.type === 'application/pdf' || value.name.endsWith('.pdf'))) {
-            hasPDF = true;
-          }
-        });
-        return hasPDF;
-      }
-      
-      // If it's a Blob or File, check its type
-      if (body instanceof Blob || body instanceof File) {
-        return body.type === 'application/pdf' || 
-              (body instanceof File && body.name.endsWith('.pdf'));
-      }
-      
-      return false;
+      // Try shared detection logic first
+      return PDFMonitor._checkIfBodyContainsPDFShared(body);
     } catch (e) {
       logger.error('Error checking if body contains PDF:', e);
       return false;
     }
+  }
+
+  /**
+   * Shared PDF detection logic (consolidated from shared utilities)
+   * @param {any} body - Request body
+   * @returns {boolean} - Whether the body likely contains a PDF
+   */
+  static _checkIfBodyContainsPDFShared(body) {
+    // Handle different body types
+    if (!body) return false;
+    
+    // If it's a string, check for PDF indicators
+    if (typeof body === 'string') {
+      return body.includes('application/pdf') || 
+             body.includes('.pdf') || 
+             body.includes('%PDF-') ||
+             body.includes('data:application/pdf');
+    }
+    
+    // If it's FormData, check its entries
+    if (body instanceof FormData) {
+      let hasPDF = false;
+      body.forEach((value, key) => {
+        if (PDFMonitor._isPdfCandidate(value)) {
+          hasPDF = true;
+        }
+      });
+      return hasPDF;
+    }
+    
+    // If it's a Blob or File, check directly
+    if (body instanceof Blob || body instanceof File) {
+      return PDFMonitor._isPdfCandidate(body);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a file is a PDF candidate (shared logic)
+   * @param {File|Blob|Object} file - File object or file-like object
+   * @returns {boolean} - Whether the file is likely a PDF
+   */
+  static _isPdfCandidate(file) {
+    if (!file) return false;
+    
+    // Check MIME type
+    if (file.type && PDF_CONSTANTS.PDF_MIME_TYPES.includes(file.type)) {
+      return true;
+    }
+    
+    // Check file extension
+    if (file.name && file.name.toLowerCase().endsWith('.pdf')) {
+      return true;
+    }
+    
+    // Check for filename patterns in objects
+    if (typeof file === 'object' && !file.type && !file.name) {
+      const filename = file.filename || file.originalname;
+      if (filename && filename.toLowerCase().endsWith('.pdf')) {
+        return true;
+      }
+    }
+    
+    return false;
   }
   
   /**
@@ -512,27 +679,9 @@ class PDFMonitor {
         return;
       }
       
-      // Create a warning badge
+      // Create a warning badge using CSS classes
       const warningBadge = document.createElement('div');
       warningBadge.className = 'pdf-scanner-attachment-warning';
-      warningBadge.style.cssText = `
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background-color: #ff4444;
-        color: white;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        z-index: 1000;
-      `;
       warningBadge.textContent = '!';
       
       // Make sure the element has position relative or absolute
@@ -586,10 +735,7 @@ class PDFMonitor {
         
         if (event.dataTransfer && event.dataTransfer.files) {
           const files = Array.from(event.dataTransfer.files);
-          const pdfFiles = files.filter(file => 
-            file.type === 'application/pdf' || 
-            file.name.toLowerCase().endsWith('.pdf')
-          );
+          const pdfFiles = files.filter(file => PDFMonitor._isPdfCandidate(file));
           
           if (pdfFiles.length > 0) {
             logger.log('PDF files dropped', {
@@ -639,10 +785,7 @@ class PDFMonitor {
       document.addEventListener('paste', (event) => {
         if (event.clipboardData && event.clipboardData.files) {
           const files = Array.from(event.clipboardData.files);
-          const pdfFiles = files.filter(file => 
-            file.type === 'application/pdf' || 
-            file.name.toLowerCase().endsWith('.pdf')
-          );
+          const pdfFiles = files.filter(file => PDFMonitor._isPdfCandidate(file));
           
           if (pdfFiles.length > 0) {
             logger.log('PDF files pasted from clipboard', {
@@ -793,11 +936,8 @@ class PDFMonitor {
       const input = event.target;
       const files = Array.from(input.files || []);
       
-      // Filter for PDF files
-      const pdfFiles = files.filter(file => 
-        file.type === 'application/pdf' || 
-        file.name.toLowerCase().endsWith('.pdf')
-      );
+      // Filter for PDF files using shared logic
+      const pdfFiles = files.filter(file => PDFMonitor._isPdfCandidate(file));
       
       if (pdfFiles.length === 0) {
         return;
@@ -879,10 +1019,7 @@ class PDFMonitor {
       
       fileInputs.forEach(input => {
         const files = Array.from(input.files || []);
-        hasPDF = hasPDF || files.some(file => 
-          file.type === 'application/pdf' || 
-          file.name.toLowerCase().endsWith('.pdf')
-        );
+        hasPDF = hasPDF || files.some(file => PDFMonitor._isPdfCandidate(file));
       });
       
       if (hasPDF) {
@@ -1079,81 +1216,33 @@ class PDFMonitor {
       this.removeExistingIndicators();
       this.removeExistingSecurityWarnings();
       
-      // Create warning element
+      // Create warning element with CSS classes
       const warningEl = document.createElement('div');
       warningEl.id = 'pdf-scanner-security-warning';
-      warningEl.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 10000;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      `;
+      warningEl.className = 'pdf-scanner-modal-overlay';
       
       // Create modal element
       const modalEl = document.createElement('div');
-      modalEl.style.cssText = `
-        background-color: white;
-        border-radius: 8px;
-        width: 500px;
-        max-width: 90%;
-        max-height: 90%;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      `;
+      modalEl.className = 'pdf-scanner-modal';
       
       // Create header
       const headerEl = document.createElement('div');
-      headerEl.style.cssText = `
-        background-color: #d32f2f;
-        color: white;
-        padding: 16px 24px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        position: relative;
-      `;
+      headerEl.className = 'pdf-scanner-modal-header pdf-scanner-error-bg';
       
       // Create icon
       const iconEl = document.createElement('div');
       iconEl.innerHTML = '⚠️';
-      iconEl.style.cssText = `
-        font-size: 24px;
-      `;
+      iconEl.className = 'pdf-scanner-modal-icon';
       
       // Create title
       const titleEl = document.createElement('h2');
       titleEl.textContent = 'Security Risk Detected';
-      titleEl.style.cssText = `
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-      `;
+      titleEl.className = 'pdf-scanner-modal-title';
       
       // Create close button
       const closeBtn = document.createElement('div');
       closeBtn.innerHTML = '✕';
-      closeBtn.style.cssText = `
-        position: absolute;
-        right: 16px;
-        top: 16px;
-        font-size: 18px;
-        cursor: pointer;
-        width: 24px;
-        height: 24px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: white;
-      `;
+      closeBtn.className = 'pdf-scanner-modal-close';
       closeBtn.addEventListener('click', () => {
         warningEl.remove();
       });
@@ -1165,52 +1254,26 @@ class PDFMonitor {
       
       // Create content area
       const contentEl = document.createElement('div');
-      contentEl.style.cssText = `
-        padding: 24px;
-        overflow-y: auto;
-        color: #333;
-      `;
+      contentEl.className = 'pdf-scanner-modal-content';
       
       // Create message
       const messageEl = document.createElement('p');
       messageEl.innerHTML = `<strong>The file "${filename}" contains sensitive information that should not be shared with AI models.</strong><br><br>Uploading this file could lead to data leakage.`;
-      messageEl.style.cssText = `
-        margin: 0 0 20px 0;
-        line-height: 1.5;
-        color: #333;
-      `;
+      messageEl.className = 'pdf-scanner-modal-message';
       
       // Create findings section
       const findingsEl = document.createElement('div');
-      findingsEl.style.cssText = `
-        background-color: #f8f9fa;
-        padding: 16px;
-        border-radius: 4px;
-        margin-bottom: 20px;
-        color: #333;
-        max-height: 300px;
-        overflow: auto;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-      `;
+      findingsEl.className = 'pdf-scanner-findings-box';
       
       // Create findings title
       const findingsTitleEl = document.createElement('div');
       findingsTitleEl.textContent = 'Detected sensitive information:';
-      findingsTitleEl.style.cssText = `
-        font-weight: bold;
-        margin-bottom: 8px;
-        color: #333;
-      `;
+      findingsTitleEl.className = 'pdf-scanner-findings-title';
       findingsEl.appendChild(findingsTitleEl);
       
-      // Create findings list
-      const findingsListEl = document.createElement('ul');
-      findingsListEl.style.cssText = `
-        margin: 0;
-        padding-left: 20px;
-        color: #333;
-      `;
+              // Create findings list
+        const findingsListEl = document.createElement('ul');
+        findingsListEl.className = 'pdf-scanner-findings-list';
       
       // Add findings - Make sure to use THIS specific result's findings
       if (result && result.findings && result.findings.length > 0) {
@@ -1255,13 +1318,7 @@ class PDFMonitor {
             return;
           }
           
-          findingEl.style.cssText = `
-            margin-bottom: 8px;
-            color: #333;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            white-space: pre-wrap;
-          `;
+          findingEl.className = 'pdf-scanner-finding-item';
           
           findingsListEl.appendChild(findingEl);
         });
@@ -1270,13 +1327,13 @@ class PDFMonitor {
         if (findingsListEl.children.length === 0) {
           const findingEl = document.createElement('li');
           findingEl.textContent = 'Potential sensitive information detected';
-          findingEl.style.cssText = `color: #333;`;
+          findingEl.className = 'pdf-scanner-finding-item';
           findingsListEl.appendChild(findingEl);
         }
       } else {
         const findingEl = document.createElement('li');
         findingEl.textContent = 'Potential sensitive information detected';
-        findingEl.style.cssText = `color: #333;`;
+        findingEl.className = 'pdf-scanner-finding-item';
         findingsListEl.appendChild(findingEl);
       }
       
@@ -1463,37 +1520,14 @@ class PDFMonitor {
       // Remove any existing indicators
       this.removeExistingIndicators();
       
-      // Create indicator element
+      // Create indicator element with CSS classes
       const indicatorEl = document.createElement('div');
       indicatorEl.id = 'pdf-scanner-indicator';
-      indicatorEl.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #f8f9fa;
-        color: #333;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 9999;
-        max-width: 80%;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      `;
+      indicatorEl.className = 'pdf-scanner-indicator pdf-scanner-info-bg';
       
       // Create spinner
       const spinnerEl = document.createElement('div');
-      spinnerEl.style.cssText = `
-        width: 20px;
-        height: 20px;
-        border: 3px solid #f3f3f3;
-        border-top: 3px solid #3498db;
-        border-radius: 50%;
-        animation: pdf-scanner-spin 1s linear infinite;
-      `;
+      spinnerEl.className = 'pdf-scanner-spinner';
       
       // Add animation
       const styleEl = document.createElement('style');
@@ -1535,33 +1569,15 @@ class PDFMonitor {
       // Remove any existing indicators
       this.removeExistingIndicators();
       
-      // Create indicator element
+      // Create indicator element with CSS classes
       const indicatorEl = document.createElement('div');
       indicatorEl.id = 'pdf-scanner-indicator';
-      indicatorEl.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #d4edda;
-        color: #155724;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 9999;
-        max-width: 80%;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      `;
+      indicatorEl.className = 'pdf-scanner-indicator pdf-scanner-success-bg';
       
       // Create icon
       const iconEl = document.createElement('div');
       iconEl.innerHTML = '✅';
-      iconEl.style.cssText = `
-        font-size: 20px;
-      `;
+      iconEl.className = 'pdf-scanner-indicator-icon';
       
       // Create message
       const messageEl = document.createElement('div');
@@ -1576,15 +1592,7 @@ class PDFMonitor {
       // Create close button
       const closeEl = document.createElement('button');
       closeEl.textContent = '×';
-      closeEl.style.cssText = `
-        background: none;
-        border: none;
-        color: #155724;
-        font-size: 24px;
-        cursor: pointer;
-        padding: 0 0 0 10px;
-        margin-left: auto;
-      `;
+      closeEl.className = 'pdf-scanner-indicator-close';
       closeEl.addEventListener('click', () => {
         indicatorEl.remove();
       });
@@ -1618,33 +1626,15 @@ class PDFMonitor {
       // Remove any existing indicators
       this.removeExistingIndicators();
       
-      // Create indicator element
+      // Create indicator element with CSS classes
       const indicatorEl = document.createElement('div');
       indicatorEl.id = 'pdf-scanner-indicator';
-      indicatorEl.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 9999;
-        max-width: 80%;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      `;
+      indicatorEl.className = 'pdf-scanner-indicator pdf-scanner-warning-bg';
       
       // Create icon
       const iconEl = document.createElement('div');
       iconEl.innerHTML = '⚠️';
-      iconEl.style.cssText = `
-        font-size: 20px;
-      `;
+      iconEl.className = 'pdf-scanner-indicator-icon';
       
       // Create message
       const messageEl = document.createElement('div');
@@ -1657,15 +1647,7 @@ class PDFMonitor {
       // Create close button
       const closeEl = document.createElement('button');
       closeEl.textContent = '×';
-      closeEl.style.cssText = `
-        background: none;
-        border: none;
-        color: #856404;
-        font-size: 24px;
-        cursor: pointer;
-        padding: 0 0 0 10px;
-        margin-left: auto;
-      `;
+      closeEl.className = 'pdf-scanner-indicator-close';
       closeEl.addEventListener('click', () => {
         indicatorEl.remove();
       });
@@ -1727,31 +1709,15 @@ class PDFMonitor {
  */
 function showStandaloneError(message) {
   try {
-    // Create indicator element
+    // Create indicator element with CSS classes
     const indicatorEl = document.createElement('div');
     indicatorEl.id = 'pdf-scanner-indicator';
-    indicatorEl.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #fff3cd;
-      color: #856404;
-      padding: 15px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 9999;
-      max-width: 80%;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    `;
+    indicatorEl.className = 'pdf-scanner-indicator pdf-scanner-warning-bg';
     
     // Create icon
     const iconEl = document.createElement('div');
     iconEl.innerHTML = '⚠️';
-    iconEl.style.cssText = `font-size: 20px;`;
+    iconEl.className = 'pdf-scanner-indicator-icon';
     
     // Create message
     const messageEl = document.createElement('div');
@@ -1760,15 +1726,7 @@ function showStandaloneError(message) {
     // Create close button
     const closeEl = document.createElement('button');
     closeEl.textContent = '×';
-    closeEl.style.cssText = `
-      background: none;
-      border: none;
-      color: #856404;
-      font-size: 24px;
-      cursor: pointer;
-      padding: 0 0 0 10px;
-      margin-left: auto;
-    `;
+    closeEl.className = 'pdf-scanner-indicator-close';
     closeEl.addEventListener('click', () => indicatorEl.remove());
     
     // Assemble UI
@@ -1780,6 +1738,19 @@ function showStandaloneError(message) {
     document.body.appendChild(indicatorEl);
   } catch (error) {
     console.error('[PDF Scanner] Error showing standalone error:', error);
+  }
+}
+
+/**
+ * Safe initialization function
+ */
+function initializePDFMonitor() {
+  try {
+    console.log('[PDF Scanner] Initializing PDF Monitor...');
+    new PDFMonitor();
+  } catch (error) {
+    console.error('[PDF Scanner] Error creating PDF Monitor:', error);
+    showStandaloneError('Error initializing PDF Scanner. Please refresh the page.');
   }
 }
 
@@ -1797,11 +1768,15 @@ try {
         return;
       }
       
-      // Context is valid, initialize normally
+      // Context is valid, initialize when DOM is ready
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => new PDFMonitor());
+        document.addEventListener('DOMContentLoaded', initializePDFMonitor);
+      } else if (document.readyState === 'interactive') {
+        // DOM is interactive but not fully loaded - wait a bit more
+        setTimeout(initializePDFMonitor, 100);
       } else {
-        new PDFMonitor();
+        // Document is fully loaded
+        initializePDFMonitor();
       }
     });
   }

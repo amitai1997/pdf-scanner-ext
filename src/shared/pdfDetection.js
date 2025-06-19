@@ -141,6 +141,77 @@ export function isFileTooLarge(size) {
 }
 
 /**
+ * Extract PDF data from a request body
+ * @param {any} body - Request body (FormData, Blob, File, string, etc.)
+ * @returns {Promise<Object|null>} - PDF data or null
+ */
+export async function extractPDFFromBody(body) {
+  try {
+    if (!body) return null;
+    
+    // Handle FormData
+    if (body instanceof FormData) {
+      let pdfFile = null;
+      body.forEach((value, key) => {
+        if (value instanceof File && isPdfCandidate(value)) {
+          pdfFile = value;
+        }
+      });
+      
+      if (pdfFile) {
+        return await _fileToDataURL(pdfFile);
+      }
+    }
+    
+    // Handle direct Blob/File
+    if ((body instanceof Blob && body.type === 'application/pdf') ||
+        (body instanceof File && isPdfCandidate(body))) {
+      return await _fileToDataURL(body);
+    }
+    
+    // Handle string with base64 PDF data
+    if (typeof body === 'string' && body.includes('data:application/pdf;base64,')) {
+      const match = body.match(/data:application\/pdf;base64,([^"'\s]+)/);
+      if (match && match[1]) {
+        const base64Data = match[1];
+        const size = Math.floor(base64Data.length * 0.75); // Rough size estimation
+        return {
+          filename: 'document.pdf',
+          size: size,
+          data: `data:application/pdf;base64,${base64Data}`
+        };
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    console.warn('[PDF Detection] Error extracting PDF from body:', e);
+    return null;
+  }
+}
+
+/**
+ * Convert a File/Blob to data URL format
+ * @param {File|Blob} file - File to convert
+ * @returns {Promise<Object>} - Object with filename, size, and data
+ * @private
+ */
+function _fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve({
+        filename: file instanceof File ? file.name : 'document.pdf',
+        size: file.size,
+        data: reader.result
+      });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Extract filename from multipart part headers
  * @param {string} headers - Headers section of a multipart part
  * @returns {string|null} - Filename or null if not found
@@ -168,5 +239,6 @@ if (typeof module !== 'undefined' && module.exports) {
     isBase64PDF,
     isFileTooLarge,
     extractFilename,
+    extractPDFFromBody,
   };
 } 
