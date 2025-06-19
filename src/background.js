@@ -1,4 +1,7 @@
-/** Chrome service worker that queues PDF scans, maintains stats and orchestrates messaging. */
+/**
+ * Chrome service worker that queues scans, tracks stats,
+ * and relays messages between scripts.
+ */
 
 // Create a logger for the background script
 const logger = {
@@ -10,7 +13,7 @@ const logger = {
         console.log(`[PDF Scanner] ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   },
   
@@ -22,7 +25,7 @@ const logger = {
         console.warn(`[PDF Scanner] WARNING: ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   },
   
@@ -34,7 +37,7 @@ const logger = {
         console.error(`[PDF Scanner] ERROR: ${message}`);
       }
     } catch (e) {
-      // Silent fail if console is not available
+      // Ignore logging errors
     }
   }
 };

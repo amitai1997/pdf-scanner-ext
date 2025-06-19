@@ -1,3 +1,6 @@
+/**
+ * ESLint configuration for the PDF Scanner project.
+ */
 import js from '@eslint/js';
 import security from 'eslint-plugin-security';
 

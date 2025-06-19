@@ -1,4 +1,7 @@
-/** Resilient client for Prompt Security protect API (retry, timeout, response mapping). */
+/**
+ * Client wrapper around the Prompt Security API
+ * with retry logic and response normalization.
+ */
 
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');

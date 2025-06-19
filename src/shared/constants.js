@@ -1,4 +1,7 @@
-/** Immutable constants shared between browser scripts and the inspection service. */
+/**
+ * Constants used by both the extension and the
+ * inspection service.
+ */
 
 export const PDF_CONSTANTS = {
   // File size limits

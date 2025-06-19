@@ -1,4 +1,7 @@
-/** Isomorphic logger with colour, level filtering and Node/Browser adaptation. */
+/**
+ * Environment-aware logger with level filtering
+ * for both Node and browser contexts.
+ */
 
 const LOG_LEVELS = {
   error: 0,

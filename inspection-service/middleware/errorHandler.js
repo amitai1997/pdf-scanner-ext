@@ -1,4 +1,7 @@
-/** Express middleware that logs errors and sends a JSON envelope; exports AppError. */
+/**
+ * Express error middleware.
+ * Logs the error and returns a JSON envelope.
+ */
 
 const logger = require('../utils/logger');
 

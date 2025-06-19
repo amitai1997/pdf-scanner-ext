@@ -1,4 +1,7 @@
-/** UI primitives (modals, indicators) injected into host pages by PDF Scanner. */
+/**
+ * Provides modals and indicators injected
+ * into host pages by the PDF Scanner.
+ */
 
 export class PDFMonitorUI {
   constructor(logger) {
