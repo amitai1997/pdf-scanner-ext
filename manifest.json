@@ -49,7 +49,6 @@
         "src/content/xhrFetchInterceptor.js",
         "src/content/watchers.js",
         "src/ui/PDFMonitorUI.js",
-        "src/content/ui.js",
         "src/content/pdfMonitor.js",
         "src/content/index.js"
       ],

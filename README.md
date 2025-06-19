@@ -160,58 +160,6 @@ curl http://localhost:3001/health
 
 ---
 
-## Project Structure
-
-```
-pdf-scanner-ext/
-├── inspection-service/          # Backend service
-│   ├── server.js               # Express server
-│   ├── middleware/             # Express middleware
-│   │   └── errorHandler.js     # Global error handling
-│   ├── services/               # External service clients
-│   │   └── promptSecurityClient.js # Prompt Security API client
-│   └── utils/                  # Utility functions
-│       └── logger.js           # Server-side logging
-├── src/                        # Extension source
-│   ├── background.js           # Service worker
-│   ├── content/                # Content scripts (loaded in order)
-│   │   ├── index.js           # Main content script entry point
-│   │   ├── logger.js          # Content script logging
-│   │   ├── constants.js       # Content script constants
-│   │   ├── domHelpers.js      # DOM manipulation utilities
-│   │   ├── xhrFetchInterceptor.js # HTTP request interception
-│   │   ├── watchers.js        # File upload monitoring
-│   │   ├── ui.js              # UI component exports
-│   │   └── pdfMonitor.js      # Main PDF monitoring class
-│   ├── popup.js               # Popup controller
-│   ├── shared/                # Shared utilities
-│   │   ├── constants.js       # Global constants
-│   │   ├── logger.js          # Universal logging class
-│   │   ├── pdfDetection.js    # PDF detection heuristics
-│   │   ├── hashUtils.js       # File hashing utilities
-│   │   ├── errors.js          # Error handling classes
-│   │   └── index.js           # Shared exports
-│   ├── ui/                    # UI Components
-│   │   └── PDFMonitorUI.js    # Main UI class for indicators/modals
-│   └── utils/                 # Extension utilities
-│       ├── formDataParser.js  # Form data parsing
-│       └── interceptor.js     # Request interception helpers
-├── public/                    # Static assets
-│   ├── popup.html            # Extension popup
-│   ├── icons/                # Extension icons
-│   │   ├── icon.svg         # Vector icon
-│   │   └── icon16.png       # 16px icon
-│   └── styles/               # CSS files
-│       ├── popup.css        # Popup styling
-│       └── shared-themes.css # Shared UI themes
-├── manifest.json             # Extension manifest (Manifest V3)
-├── docker-compose.yml        # Docker configuration
-├── eslint.config.js          # ESLint configuration
-├── jsconfig.json             # JavaScript project config
-└── README.md                 # This file
-```
-
----
 
 ## Technical Architecture
 
@@ -222,7 +170,7 @@ The extension uses traditional script loading instead of ES6 modules for maximum
 1. **Shared dependencies** (`constants.js`, `logger.js`) - Global utilities
 2. **Content utilities** (`logger.js`, `constants.js`, `domHelpers.js`) - Content-specific helpers  
 3. **Core functionality** (`xhrFetchInterceptor.js`, `watchers.js`) - Upload monitoring
-4. **UI components** (`PDFMonitorUI.js`, `ui.js`) - User interface
+4. **UI components** (`PDFMonitorUI.js`) - User interface classes and functions
 5. **Main logic** (`pdfMonitor.js`, `index.js`) - Core PDF monitoring class and entry point
 
 This approach ensures all dependencies are available globally before dependent code executes, avoiding module loading issues in Chrome extensions.
