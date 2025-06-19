@@ -106,7 +106,7 @@ NODE_ENV=development
 LOG_LEVEL=debug
 ```
 
-> **Note**: The template includes a test APP_ID for development. For production use, obtain your own credentials from [Prompt Security](https://prompt.security).
+An `.env.example` is provided in the repo root with the same variable for convenience. Obtain your own credentials from [Prompt Security](https://prompt.security).
 
 ### Step 3: Start the Inspection Service
 
@@ -151,6 +151,15 @@ curl http://localhost:3001/health
 ---
 
 ## Testing
+
+### Running Tests
+
+Unit tests use **Jest** and end‑to‑end tests run with **Playwright**.
+
+```bash
+npm test         # run Jest unit tests
+npm run test:e2e # launch Playwright and run extension tests
+```
 
 ### Manual Testing
 

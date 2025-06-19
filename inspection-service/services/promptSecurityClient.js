@@ -7,17 +7,15 @@ class PromptSecurityClient {
   constructor() {
     // Load API information from environment variables
     this.apiUrl = 'https://eu.prompt.security/api/protect';
-    // this.appId = process.env.PROMPT_SECURITY_APP_ID;
-    this.appId = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4'; // For testing purposes, replace with actual env variable in production
+    this.appId = process.env.PROMPT_SECURITY_APP_ID;
+    if (!this.appId) {
+      throw new Error('PROMPT_SECURITY_APP_ID not set');
+    }
 
     // Retry configuration
     this.maxRetries = 3;
     this.baseDelay = 1000; // 1 second
     this.timeout = 30000; // 30 seconds
-    
-    if (!this.appId) {
-      logger.warn('PROMPT_SECURITY_APP_ID not set in environment variables');
-    }
   }
 
   /**

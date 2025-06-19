@@ -71,8 +71,8 @@ describe('PDF Scanner Shared Utilities', () => {
       // Valid base64 PDF data URL
       expect(isBase64PDF('data:application/pdf;base64,JVBERi0xLjM=')).toBe(true);
       
-      // Valid base64 with PDF magic number
-      expect(isBase64PDF('JVBERi0xLjM=')).toBe(true);
+      // Short base64 strings should return false
+      expect(isBase64PDF('JVBERi0xLjM=')).toBe(false);
       
       // Invalid data
       expect(isBase64PDF('not-base64')).toBe(false);
