@@ -1,0 +1,289 @@
+/**
+ * Shared themes and styles for PDF Scanner Extension
+ * Consolidates styling to avoid duplication and ensure consistency
+ */
+
+/* CSS Variables for consistent theming */
+:root {
+  /* Colors */
+  --pdf-scanner-error: #d32f2f;
+  --pdf-scanner-warning: #ffc107;
+  --pdf-scanner-warning-text: #856404;
+  --pdf-scanner-warning-bg: #fff3cd;
+  --pdf-scanner-success: #4caf50;
+  --pdf-scanner-success-text: #155724;
+  --pdf-scanner-success-bg: #d4edda;
+  --pdf-scanner-info: #2196f3;
+  --pdf-scanner-gray: #f8f9fa;
+  --pdf-scanner-text: #333;
+  --pdf-scanner-white: #ffffff;
+  --pdf-scanner-overlay: rgba(0, 0, 0, 0.5);
+  
+  /* Spacing */
+  --pdf-scanner-spacing-xs: 4px;
+  --pdf-scanner-spacing-sm: 8px;
+  --pdf-scanner-spacing-md: 16px;
+  --pdf-scanner-spacing-lg: 24px;
+  --pdf-scanner-spacing-xl: 32px;
+  
+  /* Border radius */
+  --pdf-scanner-radius-sm: 4px;
+  --pdf-scanner-radius-md: 8px;
+  --pdf-scanner-radius-lg: 12px;
+  --pdf-scanner-radius-full: 50%;
+  
+  /* Z-index values */
+  --pdf-scanner-z-warning-modal: 10000;
+  --pdf-scanner-z-indicator: 9999;
+  --pdf-scanner-z-attachment-warning: 1000;
+  
+  /* Font families */
+  --pdf-scanner-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Shadows */
+  --pdf-scanner-shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+  --pdf-scanner-shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+  --pdf-scanner-shadow-lg: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+/* Base modal overlay */
+.pdf-scanner-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--pdf-scanner-overlay);
+  z-index: var(--pdf-scanner-z-warning-modal);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: var(--pdf-scanner-font-family);
+}
+
+/* Modal container */
+.pdf-scanner-modal {
+  background-color: var(--pdf-scanner-white);
+  border-radius: var(--pdf-scanner-radius-md);
+  width: 500px;
+  max-width: 90%;
+  max-height: 90%;
+  box-shadow: var(--pdf-scanner-shadow-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Modal header */
+.pdf-scanner-modal-header {
+  padding: var(--pdf-scanner-spacing-md) var(--pdf-scanner-spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--pdf-scanner-spacing-md);
+  position: relative;
+}
+
+.pdf-scanner-modal-header--error {
+  background-color: var(--pdf-scanner-error);
+  color: var(--pdf-scanner-white);
+}
+
+.pdf-scanner-modal-header--warning {
+  background-color: var(--pdf-scanner-warning);
+  color: var(--pdf-scanner-text);
+}
+
+/* Modal title */
+.pdf-scanner-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Modal close button */
+.pdf-scanner-modal-close {
+  position: absolute;
+  right: var(--pdf-scanner-spacing-md);
+  top: var(--pdf-scanner-spacing-md);
+  font-size: 18px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: none;
+  border: none;
+  color: inherit;
+}
+
+/* Modal content */
+.pdf-scanner-modal-content {
+  padding: var(--pdf-scanner-spacing-lg);
+  overflow-y: auto;
+  color: var(--pdf-scanner-text);
+}
+
+/* Indicator/notification styles */
+.pdf-scanner-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 15px 20px;
+  border-radius: var(--pdf-scanner-radius-md);
+  box-shadow: var(--pdf-scanner-shadow-md);
+  z-index: var(--pdf-scanner-z-indicator);
+  max-width: 80%;
+  font-family: var(--pdf-scanner-font-family);
+  display: flex;
+  align-items: center;
+  gap: var(--pdf-scanner-spacing-md);
+}
+
+.pdf-scanner-indicator--loading {
+  background-color: var(--pdf-scanner-gray);
+  color: var(--pdf-scanner-text);
+}
+
+.pdf-scanner-indicator--success {
+  background-color: var(--pdf-scanner-success-bg);
+  color: var(--pdf-scanner-success-text);
+}
+
+.pdf-scanner-indicator--warning {
+  background-color: var(--pdf-scanner-warning-bg);
+  color: var(--pdf-scanner-warning-text);
+}
+
+.pdf-scanner-indicator--error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Spinner animation */
+.pdf-scanner-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3498db;
+  border-radius: var(--pdf-scanner-radius-full);
+  animation: pdf-scanner-spin 1s linear infinite;
+}
+
+@keyframes pdf-scanner-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Warning badge for attachments */
+.pdf-scanner-attachment-warning {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: var(--pdf-scanner-error);
+  color: var(--pdf-scanner-white);
+  border-radius: var(--pdf-scanner-radius-full);
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: var(--pdf-scanner-shadow-sm);
+  z-index: var(--pdf-scanner-z-attachment-warning);
+}
+
+/* Findings section */
+.pdf-scanner-findings {
+  background-color: var(--pdf-scanner-gray);
+  padding: var(--pdf-scanner-spacing-md);
+  border-radius: var(--pdf-scanner-radius-sm);
+  margin-bottom: var(--pdf-scanner-spacing-md);
+  color: var(--pdf-scanner-text);
+  max-height: 300px;
+  overflow: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.pdf-scanner-findings-title {
+  font-weight: bold;
+  margin-bottom: var(--pdf-scanner-spacing-sm);
+  color: var(--pdf-scanner-text);
+}
+
+.pdf-scanner-findings-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--pdf-scanner-text);
+}
+
+.pdf-scanner-findings-item {
+  margin-bottom: var(--pdf-scanner-spacing-sm);
+  color: var(--pdf-scanner-text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Close button for indicators */
+.pdf-scanner-indicator-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 0 0 10px;
+  margin-left: auto;
+  color: inherit;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .pdf-scanner-modal {
+    width: 95%;
+    margin: var(--pdf-scanner-spacing-md);
+  }
+  
+  .pdf-scanner-indicator {
+    max-width: 95%;
+    left: 2.5%;
+    transform: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pdf-scanner-gray: #2d2d2d;
+    --pdf-scanner-text: #ffffff;
+    --pdf-scanner-white: #1e1e1e;
+    --pdf-scanner-overlay: rgba(0, 0, 0, 0.7);
+  }
+  
+  .pdf-scanner-findings {
+    background-color: #3a3a3a;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --pdf-scanner-shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
+    --pdf-scanner-shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --pdf-scanner-shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .pdf-scanner-spinner {
+    animation: none;
+  }
+  
+  .pdf-scanner-modal-overlay {
+    animation: none;
+  }
+} 
