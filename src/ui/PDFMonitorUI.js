@@ -165,6 +165,50 @@ class PDFMonitorUI {
   }
 
   /**
+   * Show warning modal for PDF parsing issues
+   * @param {string} filename - PDF filename
+   * @param {Object} result - Scan result with parsing error
+   */
+  showParsingWarning(filename, result) {
+    try {
+      this.logger.log('Showing parsing warning for file:', filename, result);
+      
+      // Remove any existing warnings
+      this.removeExistingIndicators();
+      this.removeExistingSecurityWarnings();
+      
+      // Create warning element with CSS classes
+      const warningEl = document.createElement('div');
+      warningEl.id = 'pdf-scanner-security-warning';
+      warningEl.className = 'pdf-scanner-modal-overlay';
+      
+      // Create modal element
+      const modalEl = document.createElement('div');
+      modalEl.className = 'pdf-scanner-modal';
+      
+      // Create header
+      const headerEl = this._createParsingWarningHeader();
+      
+      // Create content area
+      const contentEl = this._createParsingWarningContent(filename, result);
+      
+      // Assemble modal
+      modalEl.appendChild(headerEl);
+      modalEl.appendChild(contentEl);
+      warningEl.appendChild(modalEl);
+      
+      // Add to page
+      document.body.appendChild(warningEl);
+      
+      // Add escape key handler
+      this._addEscapeHandler(() => this.removeExistingSecurityWarnings());
+      
+    } catch (error) {
+      this.logger.error('Error showing parsing warning', { error: error.message });
+    }
+  }
+
+  /**
    * Add a warning indicator to an attachment element
    * @param {HTMLElement} element - Element representing a PDF attachment
    * @param {Function} onClickCallback - Callback when warning is clicked
@@ -281,6 +325,60 @@ class PDFMonitorUI {
     
     contentEl.appendChild(messageEl);
     contentEl.appendChild(findingsEl);
+    
+    return contentEl;
+  }
+
+  /**
+   * Create parsing warning modal header
+   */
+  _createParsingWarningHeader() {
+    const headerEl = document.createElement('div');
+    headerEl.className = 'pdf-scanner-modal-header pdf-scanner-warning-bg';
+    
+    const iconEl = document.createElement('div');
+    iconEl.innerHTML = '⚠️';
+    iconEl.className = 'pdf-scanner-modal-icon';
+    
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = 'PDF Scan Issue';
+    titleEl.className = 'pdf-scanner-modal-title';
+    
+    const closeEl = document.createElement('button');
+    closeEl.innerHTML = '×';
+    closeEl.className = 'pdf-scanner-modal-close';
+    closeEl.addEventListener('click', () => this.removeExistingSecurityWarnings());
+    
+    headerEl.appendChild(iconEl);
+    headerEl.appendChild(titleEl);
+    headerEl.appendChild(closeEl);
+    
+    return headerEl;
+  }
+
+  /**
+   * Create parsing warning modal content area
+   */
+  _createParsingWarningContent(filename, result) {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'pdf-scanner-modal-content';
+    
+    const messageEl = document.createElement('p');
+    messageEl.innerHTML = `<strong>Unable to properly scan "${filename}" for sensitive information.</strong><br><br>Please verify that this file does not contain any sensitive information before uploading it to AI models.`;
+    messageEl.className = 'pdf-scanner-modal-message';
+    
+    const detailsEl = document.createElement('p');
+    detailsEl.innerHTML = `<em>Issue: ${result.note || 'PDF parsing failed'}</em>`;
+    detailsEl.className = 'pdf-scanner-modal-details';
+    
+    const buttonEl = document.createElement('button');
+    buttonEl.textContent = 'I Understand';
+    buttonEl.className = 'pdf-scanner-modal-button pdf-scanner-warning-button';
+    buttonEl.addEventListener('click', () => this.removeExistingSecurityWarnings());
+    
+    contentEl.appendChild(messageEl);
+    contentEl.appendChild(detailsEl);
+    contentEl.appendChild(buttonEl);
     
     return contentEl;
   }

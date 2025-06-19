@@ -509,6 +509,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
     
     if (localSecrets.length > 0) {
       logger.info(`Found ${localSecrets.length} secrets locally`);
+      logger.debug('Local secrets found:', localSecrets.map(s => s.value));
       scanResults = {
         secrets: true,
         findings: localSecrets,
