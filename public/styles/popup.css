@@ -1,4 +1,4 @@
-/* PDF Scanner Popup Styles */
+/* Modern PDF Scanner Popup Styles */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,15 +6,16 @@
 }
 
 body {
-  width: 280px;
-  min-height: 180px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #ffffff;
-  color: #333;
+  width: 320px;
+  min-height: 200px;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #1e293b;
+  line-height: 1.5;
 }
 
 .popup-container {
-  padding: 16px;
+  padding: 20px;
   position: relative;
 }
 
@@ -22,62 +23,146 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .header h1 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
+  color: #0f172a;
+  letter-spacing: -0.025em;
 }
 
 .status-indicator {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background-color: #ccc;
+  background-color: #cbd5e1;
+  transition: background-color 0.2s ease;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #e2e8f0;
 }
 
 .status-indicator.active {
-  background-color: #4CAF50;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #a7f3d0;
 }
 
 .status-indicator.inactive {
-  background-color: #F44336;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #fecaca;
 }
 
 .status-container {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  backdrop-filter: blur(10px);
 }
 
 .status-text {
-  font-size: 14px;
-  color: #666;
+  font-size: 13px;
+  color: #64748b;
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .scan-counter {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
 }
 
 .divider {
   height: 1px;
-  background-color: #eee;
-  margin: 16px 0;
+  background: linear-gradient(90deg, transparent 0%, #e2e8f0 50%, transparent 100%);
+  margin: 20px 0;
 }
 
 .footer {
-  margin-top: 16px;
+  margin-top: 20px;
   font-size: 12px;
+  color: #64748b;
 }
 
 .powered-by {
-  font-size: 12px;
-  color: #999;
+  font-size: 11px;
+  color: #94a3b8;
   text-align: center;
-  margin-top: 8px;
+  margin-top: 12px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* Hover effects */
+.status-container:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #f1f5f9;
+  }
+
+  .header {
+    border-bottom-color: #334155;
+  }
+
+  .header h1 {
+    color: #f8fafc;
+  }
+
+  .status-container {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: #334155;
+  }
+
+  .status-container:hover {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: #475569;
+  }
+
+  .status-indicator {
+    background-color: #475569;
+    box-shadow: 0 0 0 2px #1e293b, 0 0 0 3px #334155;
+  }
+
+  .status-indicator.active {
+    box-shadow: 0 0 0 2px #1e293b, 0 0 0 3px #065f46;
+  }
+
+  .status-indicator.inactive {
+    box-shadow: 0 0 0 2px #1e293b, 0 0 0 3px #991b1b;
+  }
+
+  .status-text {
+    color: #94a3b8;
+  }
+
+  .scan-counter {
+    color: #f8fafc;
+  }
+
+  .footer {
+    color: #94a3b8;
+  }
+
+  .powered-by {
+    color: #64748b;
+  }
+
+  .divider {
+    background: linear-gradient(90deg, transparent 0%, #334155 50%, transparent 100%);
+  }
 }
 

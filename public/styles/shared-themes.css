@@ -1,647 +1,414 @@
 /**
- * Shared themes and styles for PDF Scanner Extension
- * Consolidates styling to avoid duplication and ensure consistency
+ * Modern PDF Scanner Extension Styles
+ * Clean, contemporary design without animations
  */
 
-/* CSS Variables for consistent theming */
+/* Modern CSS Variables */
 :root {
-  /* Colors */
-  --pdf-scanner-error: #d32f2f;
-  --pdf-scanner-warning: #ffc107;
-  --pdf-scanner-warning-text: #856404;
-  --pdf-scanner-warning-bg: #fff3cd;
-  --pdf-scanner-success: #4caf50;
-  --pdf-scanner-success-text: #155724;
-  --pdf-scanner-success-bg: #d4edda;
-  --pdf-scanner-info: #2196f3;
-  --pdf-scanner-gray: #f8f9fa;
-  --pdf-scanner-text: #333;
+  /* Colors - Modern palette */
+  --pdf-scanner-error: #ef4444;
+  --pdf-scanner-error-bg: #fef2f2;
+  --pdf-scanner-error-border: #fecaca;
+  --pdf-scanner-error-text: #dc2626;
+  
+  --pdf-scanner-warning: #f59e0b;
+  --pdf-scanner-warning-bg: #fffbeb;
+  --pdf-scanner-warning-border: #fed7aa;
+  --pdf-scanner-warning-text: #d97706;
+  
+  --pdf-scanner-success: #10b981;
+  --pdf-scanner-success-bg: #ecfdf5;
+  --pdf-scanner-success-border: #a7f3d0;
+  --pdf-scanner-success-text: #059669;
+  
+  --pdf-scanner-info: #3b82f6;
+  --pdf-scanner-info-bg: #eff6ff;
+  --pdf-scanner-info-border: #93c5fd;
+  --pdf-scanner-info-text: #2563eb;
+  
+  --pdf-scanner-neutral: #6b7280;
+  --pdf-scanner-neutral-light: #f9fafb;
+  --pdf-scanner-neutral-border: #e5e7eb;
+  --pdf-scanner-text: #111827;
+  --pdf-scanner-text-muted: #6b7280;
   --pdf-scanner-white: #ffffff;
-  --pdf-scanner-overlay: rgba(0, 0, 0, 0.5);
+  --pdf-scanner-overlay: rgba(0, 0, 0, 0.75);
   
-  /* Spacing */
-  --pdf-scanner-spacing-xs: 4px;
-  --pdf-scanner-spacing-sm: 8px;
-  --pdf-scanner-spacing-md: 16px;
-  --pdf-scanner-spacing-lg: 24px;
-  --pdf-scanner-spacing-xl: 32px;
+  /* Spacing - 8px base unit */
+  --pdf-scanner-space-1: 4px;
+  --pdf-scanner-space-2: 8px;
+  --pdf-scanner-space-3: 12px;
+  --pdf-scanner-space-4: 16px;
+  --pdf-scanner-space-5: 20px;
+  --pdf-scanner-space-6: 24px;
+  --pdf-scanner-space-8: 32px;
+  --pdf-scanner-space-10: 40px;
+  --pdf-scanner-space-12: 48px;
   
-  /* Border radius */
-  --pdf-scanner-radius-sm: 4px;
+  /* Border radius - Modern rounded corners */
+  --pdf-scanner-radius-sm: 6px;
   --pdf-scanner-radius-md: 8px;
   --pdf-scanner-radius-lg: 12px;
-  --pdf-scanner-radius-full: 50%;
+  --pdf-scanner-radius-xl: 16px;
+  --pdf-scanner-radius-full: 9999px;
   
-  /* Z-index values */
-  --pdf-scanner-z-warning-modal: 10000;
-  --pdf-scanner-z-indicator: 9999;
-  --pdf-scanner-z-attachment-warning: 1000;
+  /* Shadows - Subtle depth */
+  --pdf-scanner-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --pdf-scanner-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --pdf-scanner-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --pdf-scanner-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   
-  /* Font families */
-  --pdf-scanner-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Typography */
+  --pdf-scanner-font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --pdf-scanner-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   
-  /* Shadows */
-  --pdf-scanner-shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
-  --pdf-scanner-shadow-md: 0 4px 12px rgba(0,0,0,0.15);
-  --pdf-scanner-shadow-lg: 0 8px 24px rgba(0,0,0,0.2);
+  /* Z-index */
+  --pdf-scanner-z-modal: 50;
+  --pdf-scanner-z-notification: 40;
+  --pdf-scanner-z-tooltip: 30;
 }
 
-/* Base modal overlay - matching original inline styles */
+/* Reset and base styles */
+.pdf-scanner-modal-overlay *,
+.pdf-scanner-indicator *,
+.pdf-scanner-modal * {
+  box-sizing: border-box;
+}
+
+/* Modal Overlay - Clean backdrop */
 .pdf-scanner-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 10000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* Modal container - matching original inline styles */
-.pdf-scanner-modal {
-  background-color: white;
-  border-radius: 8px;
-  width: 500px;
-  max-width: 90%;
-  max-height: 90%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-/* Modal header - matching original inline styles */
-.pdf-scanner-modal-header {
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-}
-
-/* Error background (red header) - matching original */
-.pdf-scanner-error-bg {
-  background-color: #d32f2f;
-  color: white;
-}
-
-/* Modal icon - matching original */
-.pdf-scanner-modal-icon {
-  font-size: 24px;
-}
-
-/* Modal title - matching original */
-.pdf-scanner-modal-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-/* Modal close button - matching original */
-.pdf-scanner-modal-close {
-  position: absolute;
-  right: 16px;
-  top: 16px;
-  font-size: 18px;
-  cursor: pointer;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: none;
-  border: none;
-  color: white;
-}
-
-/* Modal content - matching original */
-.pdf-scanner-modal-content {
-  padding: 24px;
-  overflow-y: auto;
-  color: #333;
-}
-
-/* Modal message - matching original */
-.pdf-scanner-modal-message {
-  margin: 0 0 20px 0;
-  line-height: 1.5;
-  color: #333;
-}
-
-/* Indicator/notification styles - matching original */
-.pdf-scanner-indicator {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 15px 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 9999;
-  max-width: 80%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* Info background (gray) - matching original */
-.pdf-scanner-info-bg {
-  background-color: #f8f9fa;
-  color: #333;
-}
-
-/* Success background (green) - matching original */
-.pdf-scanner-success-bg {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-/* Warning background (yellow) - matching original */
-.pdf-scanner-warning-bg {
-  background-color: #fff3cd;
-  color: #856404;
-}
-
-/* Indicator icon - matching original */
-.pdf-scanner-indicator-icon {
-  font-size: 20px;
-}
-
-/* Indicator close button - matching original */
-.pdf-scanner-indicator-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0 0 0 10px;
-  margin-left: auto;
-  color: inherit;
-}
-
-/* Spinner animation - matching original */
-.pdf-scanner-spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #3498db;
-  border-radius: 50%;
-  animation: pdf-scanner-spin 1s linear infinite;
-}
-
-@keyframes pdf-scanner-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Warning badge for attachments - matching original */
-.pdf-scanner-attachment-warning {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background-color: #ff4444;
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  inset: 0;
+  background-color: var(--pdf-scanner-overlay);
+  backdrop-filter: blur(2px);
+  z-index: var(--pdf-scanner-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  z-index: 1000;
-}
-
-/* Findings section - matching original */
-.pdf-scanner-findings-box {
-  background-color: #f8f9fa;
-  padding: 16px;
-  border-radius: 4px;
-  margin-bottom: 20px;
-  color: #333;
-  max-height: 300px;
-  overflow: auto;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.pdf-scanner-findings-title {
-  font-weight: bold;
-  margin-bottom: 8px;
-  color: #333;
-}
-
-.pdf-scanner-findings-list {
-  margin: 0;
-  padding-left: 20px;
-  color: #333;
-}
-
-.pdf-scanner-finding-item {
-  margin-bottom: 8px;
-  color: #333;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-/* Close button for indicators */
-.pdf-scanner-indicator-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0 0 0 10px;
-  margin-left: auto;
-  color: inherit;
-}
-
-/* Responsive adjustments */
-@media (max-width: 600px) {
-  .pdf-scanner-modal {
-    width: 95%;
-    margin: var(--pdf-scanner-spacing-md);
-  }
-  
-  .pdf-scanner-indicator {
-    max-width: 95%;
-    left: 2.5%;
-    transform: none;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --pdf-scanner-gray: #2d2d2d;
-    --pdf-scanner-text: #ffffff;
-    --pdf-scanner-white: #1e1e1e;
-    --pdf-scanner-overlay: rgba(0, 0, 0, 0.7);
-  }
-  
-  .pdf-scanner-findings {
-    background-color: #3a3a3a;
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  :root {
-    --pdf-scanner-shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
-    --pdf-scanner-shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-    --pdf-scanner-shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .pdf-scanner-spinner {
-    animation: none;
-  }
-  
-  .pdf-scanner-modal-overlay {
-    animation: none;
-  }
-}
-
-/* PDF Scanner Extension - Shared Theme Styles */
-/* This file provides consistent styling across all extension components */
-
-/* Base variables for consistent theming */
-:root {
-  --pdf-scanner-error: #d32f2f;
-  --pdf-scanner-warning: #ffc107;
-  --pdf-scanner-success: #4caf50;
-  --pdf-scanner-info: #2196f3;
-  --pdf-scanner-gray: #f8f9fa;
-  --pdf-scanner-text: #333;
-  --pdf-scanner-white: #ffffff;
-  --pdf-scanner-shadow: rgba(0, 0, 0, 0.2);
-  --pdf-scanner-shadow-light: rgba(0, 0, 0, 0.1);
-  --pdf-scanner-border-radius: 8px;
-  --pdf-scanner-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-/* Modal overlay styles */
-.pdf-scanner-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: var(--pdf-scanner-space-4);
   font-family: var(--pdf-scanner-font-family);
 }
 
-/* Modal container */
+/* Modal Container - Modern card design */
 .pdf-scanner-modal {
   background: var(--pdf-scanner-white);
-  border-radius: var(--pdf-scanner-border-radius);
-  box-shadow: 0 8px 32px var(--pdf-scanner-shadow);
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
+  border-radius: var(--pdf-scanner-radius-xl);
+  box-shadow: var(--pdf-scanner-shadow-xl);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
   overflow: hidden;
-  animation: pdf-scanner-modal-appear 0.2s ease-out;
+  display: flex;
+  flex-direction: column;
 }
 
-@keyframes pdf-scanner-modal-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* Modal header */
+/* Modal Header - Clean header with accent colors */
 .pdf-scanner-modal-header {
+  padding: var(--pdf-scanner-space-6);
   display: flex;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  gap: var(--pdf-scanner-space-3);
   position: relative;
+  border-bottom: 1px solid var(--pdf-scanner-neutral-border);
 }
 
+.pdf-scanner-error-bg {
+  background: linear-gradient(135deg, var(--pdf-scanner-error) 0%, #dc2626 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.pdf-scanner-warning-bg {
+  background: linear-gradient(135deg, var(--pdf-scanner-warning) 0%, #d97706 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.pdf-scanner-success-bg {
+  background: linear-gradient(135deg, var(--pdf-scanner-success) 0%, #059669 100%);
+  color: white;
+  border-bottom: none;
+}
+
+.pdf-scanner-info-bg {
+  background: linear-gradient(135deg, var(--pdf-scanner-info) 0%, #2563eb 100%);
+  color: white;
+  border-bottom: none;
+}
+
+/* Modal Icon - Modern sizing */
 .pdf-scanner-modal-icon {
-  font-size: 24px;
-  margin-right: 12px;
-  flex-shrink: 0;
+  font-size: 28px;
+  line-height: 1;
 }
 
+/* Modal Title - Clean typography */
 .pdf-scanner-modal-title {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: var(--pdf-scanner-text);
-  flex: 1;
+  line-height: 1.25;
 }
 
+/* Modal Close Button - Modern close button */
 .pdf-scanner-modal-close {
   position: absolute;
-  top: 16px;
-  right: 20px;
-  background: none;
+  top: var(--pdf-scanner-space-4);
+  right: var(--pdf-scanner-space-4);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pdf-scanner-radius-full);
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  font-size: 24px;
-  color: #666;
+  color: currentColor;
   cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  font-size: 16px;
+  transition: background-color 0.15s ease;
 }
 
 .pdf-scanner-modal-close:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Modal content */
+.pdf-scanner-modal-close:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* Modal Content - Clean content area */
 .pdf-scanner-modal-content {
-  padding: 20px;
+  padding: var(--pdf-scanner-space-6);
   overflow-y: auto;
-  max-height: 60vh;
+  flex: 1;
 }
 
+/* Modal Message - Readable typography */
 .pdf-scanner-modal-message {
-  margin: 0 0 20px 0;
-  line-height: 1.5;
+  margin: 0 0 var(--pdf-scanner-space-5) 0;
+  line-height: 1.6;
   color: var(--pdf-scanner-text);
+  font-size: 15px;
 }
 
-/* Background color utilities */
-.pdf-scanner-error-bg {
-  background-color: var(--pdf-scanner-error);
-  color: var(--pdf-scanner-white);
-}
-
-.pdf-scanner-warning-bg {
-  background-color: var(--pdf-scanner-warning);
-  color: var(--pdf-scanner-text);
-}
-
-.pdf-scanner-success-bg {
-  background-color: var(--pdf-scanner-success);
-  color: var(--pdf-scanner-white);
-}
-
-.pdf-scanner-info-bg {
-  background-color: var(--pdf-scanner-info);
-  color: var(--pdf-scanner-white);
-}
-
-/* Findings section */
-.pdf-scanner-findings-box {
-  background: var(--pdf-scanner-gray);
-  border: 1px solid #e0e0e0;
-  border-radius: var(--pdf-scanner-border-radius);
-  padding: 16px;
-  margin-top: 16px;
-}
-
-.pdf-scanner-findings-title {
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--pdf-scanner-text);
-}
-
-.pdf-scanner-findings-list {
-  margin: 0;
-  padding-left: 20px;
-  list-style-type: disc;
-}
-
-.pdf-scanner-finding-item {
-  margin-bottom: 8px;
-  line-height: 1.4;
-  color: var(--pdf-scanner-text);
-}
-
-.pdf-scanner-finding-item:last-child {
-  margin-bottom: 0;
-}
-
-/* Indicator styles */
+/* Notification/Indicator - Modern toast design */
 .pdf-scanner-indicator {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 9999;
-  padding: 12px 16px;
-  border-radius: var(--pdf-scanner-border-radius);
-  box-shadow: 0 4px 16px var(--pdf-scanner-shadow-light);
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  top: var(--pdf-scanner-space-5);
+  right: var(--pdf-scanner-space-5);
+  padding: var(--pdf-scanner-space-4) var(--pdf-scanner-space-5);
+  border-radius: var(--pdf-scanner-radius-lg);
+  box-shadow: var(--pdf-scanner-shadow-lg);
+  z-index: var(--pdf-scanner-z-notification);
   max-width: 400px;
+  min-width: 300px;
   font-family: var(--pdf-scanner-font-family);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pdf-scanner-space-3);
+  border: 1px solid;
   font-size: 14px;
-  animation: pdf-scanner-indicator-slide-in 0.3s ease-out;
+  line-height: 1.5;
 }
 
-@keyframes pdf-scanner-indicator-slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.pdf-scanner-indicator.pdf-scanner-error-bg {
+  background: var(--pdf-scanner-error-bg);
+  border-color: var(--pdf-scanner-error-border);
+  color: var(--pdf-scanner-error-text);
 }
 
+.pdf-scanner-indicator.pdf-scanner-warning-bg {
+  background: var(--pdf-scanner-warning-bg);
+  border-color: var(--pdf-scanner-warning-border);
+  color: var(--pdf-scanner-warning-text);
+}
+
+.pdf-scanner-indicator.pdf-scanner-success-bg {
+  background: var(--pdf-scanner-success-bg);
+  border-color: var(--pdf-scanner-success-border);
+  color: var(--pdf-scanner-success-text);
+}
+
+.pdf-scanner-indicator.pdf-scanner-info-bg {
+  background: var(--pdf-scanner-info-bg);
+  border-color: var(--pdf-scanner-info-border);
+  color: var(--pdf-scanner-info-text);
+}
+
+/* Indicator Icon - Proper sizing */
 .pdf-scanner-indicator-icon {
   font-size: 18px;
+  line-height: 1;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
+/* Indicator Close Button - Clean close */
 .pdf-scanner-indicator-close {
   background: none;
   border: none;
-  color: inherit;
-  font-size: 18px;
+  color: currentColor;
   cursor: pointer;
   padding: 0;
   margin-left: auto;
-  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
   opacity: 0.7;
-  transition: opacity 0.2s;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
 }
 
 .pdf-scanner-indicator-close:hover {
   opacity: 1;
 }
 
-/* Spinner animation */
+/* Spinner - Minimal loading indicator */
 .pdf-scanner-spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: pdf-scanner-spin 1s linear infinite;
+  border: 2px solid currentColor;
+  border-top: 2px solid transparent;
+  border-radius: var(--pdf-scanner-radius-full);
+  opacity: 0.7;
   flex-shrink: 0;
+  margin-top: 1px;
+  animation: pdf-scanner-spin 1s linear infinite;
 }
 
 @keyframes pdf-scanner-spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* Attachment warning badge */
+/* Findings Box - Clean findings display */
+.pdf-scanner-findings-box {
+  background: var(--pdf-scanner-neutral-light);
+  border: 1px solid var(--pdf-scanner-neutral-border);
+  border-radius: var(--pdf-scanner-radius-md);
+  padding: var(--pdf-scanner-space-4);
+  margin-top: var(--pdf-scanner-space-4);
+}
+
+.pdf-scanner-findings-title {
+  font-weight: 600;
+  margin-bottom: var(--pdf-scanner-space-3);
+  color: var(--pdf-scanner-text);
+  font-size: 14px;
+}
+
+.pdf-scanner-findings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pdf-scanner-space-2);
+}
+
+.pdf-scanner-finding-item {
+  padding: var(--pdf-scanner-space-2) var(--pdf-scanner-space-3);
+  background: var(--pdf-scanner-white);
+  border: 1px solid var(--pdf-scanner-neutral-border);
+  border-radius: var(--pdf-scanner-radius-sm);
+  font-size: 13px;
+  color: var(--pdf-scanner-text);
+  font-family: var(--pdf-scanner-font-mono);
+}
+
+/* Attachment Warning - Subtle indicator */
 .pdf-scanner-attachment-warning {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -4px;
+  right: -4px;
   width: 20px;
   height: 20px;
   background: var(--pdf-scanner-error);
-  color: var(--pdf-scanner-white);
-  border-radius: 50%;
+  color: white;
+  border-radius: var(--pdf-scanner-radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  font-weight: bold;
-  z-index: 1000;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: var(--pdf-scanner-shadow-md);
   border: 2px solid var(--pdf-scanner-white);
-  box-shadow: 0 2px 8px var(--pdf-scanner-shadow-light);
-  animation: pdf-scanner-warning-pulse 2s infinite;
 }
 
-@keyframes pdf-scanner-warning-pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-}
-
-.pdf-scanner-attachment-warning:hover {
-  transform: scale(1.1);
-  animation: none;
-}
-
-/* Responsive adjustments */
-@media (max-width: 600px) {
+/* Responsive Design */
+@media (max-width: 640px) {
   .pdf-scanner-modal {
-    width: 95%;
-    margin: 10px;
+    margin: var(--pdf-scanner-space-4);
+    max-width: none;
   }
   
+  .pdf-scanner-modal-header,
   .pdf-scanner-modal-content {
-    padding: 16px;
+    padding: var(--pdf-scanner-space-4);
   }
   
   .pdf-scanner-indicator {
-    top: 10px;
-    right: 10px;
-    left: 10px;
+    top: var(--pdf-scanner-space-4);
+    right: var(--pdf-scanner-space-4);
+    left: var(--pdf-scanner-space-4);
     max-width: none;
+    min-width: 0;
   }
 }
 
-/* High contrast mode support */
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pdf-scanner-text: #f9fafb;
+    --pdf-scanner-text-muted: #9ca3af;
+    --pdf-scanner-white: #1f2937;
+    --pdf-scanner-neutral-light: #374151;
+    --pdf-scanner-neutral-border: #4b5563;
+    --pdf-scanner-overlay: rgba(0, 0, 0, 0.85);
+  }
+  
+  .pdf-scanner-findings-box {
+    background: var(--pdf-scanner-neutral-light);
+  }
+  
+  .pdf-scanner-finding-item {
+    background: var(--pdf-scanner-white);
+    color: var(--pdf-scanner-text);
+  }
+}
+
+/* High Contrast Mode */
 @media (prefers-contrast: high) {
   .pdf-scanner-modal {
     border: 2px solid var(--pdf-scanner-text);
   }
   
-  .pdf-scanner-modal-header {
-    border-bottom: 2px solid var(--pdf-scanner-text);
-  }
-  
-  .pdf-scanner-findings-box {
-    border: 2px solid var(--pdf-scanner-text);
+  .pdf-scanner-indicator {
+    border-width: 2px;
   }
 }
 
-/* Reduced motion support */
+/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
-  .pdf-scanner-modal,
-  .pdf-scanner-indicator {
-    animation: none;
-  }
-  
   .pdf-scanner-spinner {
     animation: none;
-    border: 2px solid currentColor;
-    border-radius: 0;
   }
   
-  .pdf-scanner-attachment-warning {
-    animation: none;
+  .pdf-scanner-modal-close,
+  .pdf-scanner-indicator-close {
+    transition: none;
   }
 }
 
-/* Focus styles for accessibility */
-.pdf-scanner-modal-close:focus,
-.pdf-scanner-indicator-close:focus {
+/* Focus Management */
+.pdf-scanner-modal-close:focus-visible,
+.pdf-scanner-indicator-close:focus-visible {
   outline: 2px solid var(--pdf-scanner-info);
   outline-offset: 2px;
 }
 
-/* Print styles */
+/* Print Styles */
 @media print {
   .pdf-scanner-modal-overlay,
   .pdf-scanner-indicator,
