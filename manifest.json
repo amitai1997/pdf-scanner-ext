@@ -40,7 +40,7 @@
         "https://*.claude.ai/*",
         "https://*.anthropic.com/*"
       ],
-      "js": ["src/content.js"],
+      "js": ["src/content/index.js"],
       "run_at": "document_start"
     }
   ],

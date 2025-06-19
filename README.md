@@ -171,7 +171,7 @@ pdf-scanner-ext/
 │   └── utils/                  # Utility functions
 ├── src/                        # Extension source
 │   ├── background.js           # Service worker
-│   ├── content.js              # Content script
+│   ├── content/index.js              # Content script
 │   ├── popup.js                # Popup controller
 │   ├── shared/                 # Shared utilities
 │   └── utils/                  # Extension utilities
