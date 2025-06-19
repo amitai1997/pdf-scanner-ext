@@ -218,23 +218,23 @@ async function extractPDFTextDeterministic(buffer, filename) {
       // Only look for direct patterns if we haven't found secrets in streams
       if (!extractedText.includes('AKIA')) {
         // Look for direct secret patterns in binary data
-        const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
-        const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
-        
-        const awsKeys = binaryString.match(awsKeyPattern) || [];
-        const secrets = binaryString.match(secretPattern) || [];
-        
-        // PRIORITIZE actual secrets over metadata
-        if (awsKeys.length > 0) {
-          extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
-          logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
-        } else if (secrets.length > 0) {
-          // Filter out short matches and PDF noise
-          const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
-          if (realSecrets.length > 0) {
+      const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
+      const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
+      
+      const awsKeys = binaryString.match(awsKeyPattern) || [];
+      const secrets = binaryString.match(secretPattern) || [];
+      
+      // PRIORITIZE actual secrets over metadata
+      if (awsKeys.length > 0) {
+        extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
+        logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
+      } else if (secrets.length > 0) {
+        // Filter out short matches and PDF noise
+        const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
+        if (realSecrets.length > 0) {
             extractedText += ' ' + realSecrets.join(' ');
-            logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
-          }
+          logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
+        }
         }
       }
       
@@ -354,7 +354,7 @@ function detectSecretsLocally(text) {
   // AWS Access Key pattern
   const awsKeyPattern = /AKIA[0-9A-Z]{16}/g;
   const awsKeys = text.match(awsKeyPattern) || [];
-  
+
   // AWS Secret Key pattern
   const awsSecretPattern = /[A-Za-z0-9+/]{40}[A-Za-z0-9+/=]{0,2}/g;
   const awsSecrets = text.match(awsSecretPattern) || [];
@@ -362,10 +362,10 @@ function detectSecretsLocally(text) {
   // Add AWS Access Keys
   awsKeys.forEach(key => {
     findings.push({
-      type: 'Secret',
+    type: 'Secret',
       category: 'AWS Access Key',
-      value: key,
-      severity: 'high'
+    value: key,
+    severity: 'high'
     });
   });
   
@@ -534,10 +534,10 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       return res.json(scanResults);
     }
 
-    // Send to Prompt Security API (single source of truth)
-    try {
+      // Send to Prompt Security API (single source of truth)
+      try {
       const apiResults = await promptSecurity.scanText(extractedText);
-      
+
       scanResults = {
         ...apiResults,
         scannedAt: new Date().toISOString(),
@@ -549,9 +549,9 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       
       scanResults = {
         secrets: false,
-        findings: [],
+            findings: [],
         action: 'warn',
-        scannedAt: new Date().toISOString(),
+            scannedAt: new Date().toISOString(),
         note: 'Error scanning content',
         extractionError: true,
         safe: false // Explicitly mark as not safe on API error
