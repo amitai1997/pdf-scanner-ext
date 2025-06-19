@@ -327,12 +327,11 @@ async function extractPDFTextDeterministic(buffer, filename) {
         numpages: 0,
         parseError: true
       };
-      
-      // Cache even the error result to ensure consistency
-      pdfParseCache.set(cacheKey, errorResult);
+
+      // Do not cache parse failures to avoid persistent false negatives
       resolveParsePromise(errorResult);
-      logger.warn(`Cached error result for ${filename}: no extractable text`);
-      
+      logger.warn(`Parse failed for ${filename}: no extractable text`);
+
       return errorResult;
     }
     
@@ -358,10 +357,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
       parseError: true
     };
     
-    // Cache the error result to ensure consistency
-    pdfParseCache.set(cacheKey, errorResult);
-    logger.warn(`Cached error result for ${filename}: ${error.message}`);
-    
+    // Do not cache error results to avoid stale failures
+    logger.warn(`Parse error for ${filename}: ${error.message}`);
+
     // Resolve with error result instead of rejecting
     resolveParsePromise(errorResult);
     
@@ -372,9 +370,22 @@ async function extractPDFTextDeterministic(buffer, filename) {
   }
 }
 
-// Secret patterns removed - now using Prompt Security API exclusively
+// ---------------------------------------------------------------------------
+// 3b. Local secret detection helpers
+// ---------------------------------------------------------------------------
+/** Simple regex-based check for AWS access keys and similar patterns */
+function detectSecretsLocally(text) {
+  const awsKeyPattern = /AKIA[0-9A-Z]{16}/g;
+  const matches = text.match(awsKeyPattern) || [];
 
-// performLocalScan function removed - now using Prompt Security API exclusively
+  return matches.map(key => ({
+    type: 'Secret',
+    category: 'AWS credentials',
+    value: key,
+    severity: 'high'
+  }));
+}
+
 
 // ---------------------------------------------------------------------------
 // 4. Middleware stack
@@ -506,10 +517,10 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       try {
         logger.info(`Sending ${extractedText.length} characters to Prompt Security API`);
         scanResults = await promptSecurity.scanText(extractedText);
-        
-        // The API is authoritative - trust their secret detection
+
+        // Log API assessment
         logger.info(`API scan complete: ${scanResults.secrets ? 'SECRETS FOUND' : 'NO SECRETS'}`);
-        
+
       } catch (apiErr) {
         logger.error('Prompt Security API error:', apiErr.message);
         
@@ -527,6 +538,17 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         
         // For other API errors, still throw to be handled by error middleware
         throw apiErr;
+      }
+      // ---------------------------------------------------------------
+      // Local secret detection as a safeguard against API false negatives
+      const localFindings = detectSecretsLocally(extractedText);
+      if (localFindings.length > 0) {
+        if (!scanResults.secrets) {
+          logger.warn('Local secret detection found secrets not flagged by API');
+        }
+        scanResults.secrets = true;
+        scanResults.action = 'block';
+        scanResults.findings = (scanResults.findings || []).concat(localFindings);
       }
     }
 
