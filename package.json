@@ -11,8 +11,7 @@
     "dev": "npm run dev:service",
     "dev:service": "cd inspection-service && npm run dev",
     "dev:docker": "docker-compose up",
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:e2e": "playwright test",
+    "test": "playwright test",
     "validate": "web-ext lint --source-dir .",
     "clean": "rm -rf dist/ web-ext-artifacts/",
     "docker:up": "docker-compose up -d",
@@ -35,9 +34,7 @@
     "eslint-plugin-security": "^3.0.0",
     "prettier": "^3.0.0",
     "web-ext": "^8.0.0",
-    "@playwright/test": "^1.40.0",
-    "jest": "^29.0.0",
-    "jest-webextension-mock": "^3.1.0"
+    "@playwright/test": "^1.40.0"
   },
   "prettier": {
     "semi": true,

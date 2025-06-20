@@ -13,7 +13,7 @@ const LOG_LEVELS = {
 /**
  * Universal logger class that adapts to different environments
  */
-export class Logger {
+self.Logger = class Logger {
   constructor(options = {}) {
     const {
       level = 'info',
@@ -171,8 +171,8 @@ export class Logger {
  * @param {Object} options - Logger options
  * @returns {Object} - Simple logger interface
  */
-export function createSimpleLogger(options = {}) {
-  const logger = new Logger(options);
+self.createSimpleLogger = function createSimpleLogger(options = {}) {
+  const logger = new self.Logger(options);
   
   return {
     log: (message, data) => logger.log(message, data),
@@ -186,12 +186,12 @@ export function createSimpleLogger(options = {}) {
 /**
  * Default logger instances for different contexts
  */
-export const extensionLogger = createSimpleLogger({
+self.extensionLogger = self.createSimpleLogger({
   prefix: '[PDF Scanner]',
   level: 'info'
 });
 
-export const serviceLogger = new Logger({
+self.serviceLogger = new self.Logger({
   serviceName: 'PDF-Scanner-Service',
   level: (typeof process !== 'undefined' && process?.env?.LOG_LEVEL) || 
          (typeof process !== 'undefined' && process?.env?.NODE_ENV === 'development' ? 'debug' : 'info')
