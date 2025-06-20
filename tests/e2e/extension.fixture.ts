@@ -26,7 +26,7 @@ export const test = base.extend<{
         `--disable-extensions-except=${EXT_PATH}`,
         `--load-extension=${EXT_PATH}`,
       ],
-      headless: false,
+      headless: process.env.CI ? true : false,
     });
 
     // Hook up logging
