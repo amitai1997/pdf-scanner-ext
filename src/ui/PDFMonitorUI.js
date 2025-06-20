@@ -136,7 +136,9 @@ class PDFMonitorUI {
    */
   showScanErrorIndicator(filename, errorMessage) {
     try {
+      // Ensure we only show ONE banner: clear both indicators & modal overlays first
       this.removeExistingIndicators();
+      this.removeExistingSecurityWarnings();
       
       const indicatorEl = document.createElement('div');
       indicatorEl.id = 'pdf-scanner-indicator';

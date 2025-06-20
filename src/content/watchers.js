@@ -42,6 +42,133 @@ function startMonitoring() {
 }
 
 /**
+ * Process a PDF file - common logic for all file detection methods
+ * @param {File} file - The PDF file to process
+ * @param {Object} options - Processing options
+ * @param {boolean} options.preventUpload - Whether to try to prevent upload on secrets detection
+ * @param {HTMLInputElement} options.fileInput - The input element (for upload prevention)
+ */
+function processPDFFile(file, options = {}) {
+  try {
+    // Show scanning indicator to user immediately
+    this.ui.showScanningIndicator(file.name);
+
+    // Immediate scan of the PDF
+    this.scanPDFImmediately(file)
+      .then((result) => {
+        logger.log('Immediate scan result:', result);
+
+        if (result.secrets) {
+          // If secrets found, show warning
+          this.ui.showSecretWarning(file.name, result);
+
+          // Try to prevent upload if requested and we have a file input
+          if (options.preventUpload && options.fileInput) {
+            this.preventFileUpload(options.fileInput, file);
+          }
+        } else if (result.extractionError || result.note === 'PDF parsing failed') {
+          // Parsing failed: show scan error indicator
+          logger.log('PDF parsing failed – showing scan error indicator');
+          this.ui.showScanErrorIndicator(file.name, 'No text could be extracted from this file.');
+        } else if (result.action === 'warn') {
+          // Generic warn actions (e.g. large file, partial scan) – show modal for more detail
+          this.ui.showParsingWarning(file.name, result);
+        } else {
+          // Only show safe indicator if no secrets AND no warnings/errors
+          this.ui.showSafeFileIndicator(file.name);
+        }
+      })
+      .catch((error) => {
+        logger.error('Error during immediate scan of PDF', error);
+        this.ui.showParsingWarning(file.name, { 
+          note: `Scan error: ${error.message}`,
+          extractionError: true 
+        });
+      });
+
+    // Also track the upload through our normal channels as backup
+    this.trackUpload(file);
+  } catch (error) {
+    logger.error('Error processing PDF file', { error: error.message, filename: file.name });
+  }
+}
+
+/**
+ * Prevent file upload by clearing input and attempting other methods
+ * @param {HTMLInputElement} input - The file input element
+ * @param {File} file - The file that was detected with secrets
+ */
+function preventFileUpload(input, file) {
+  try {
+    // Method 1: Clear the file input
+    input.value = '';
+
+    // Method 2: Try to clear the files property (may not work in all browsers)
+    try {
+      Object.defineProperty(input, 'files', {
+        value: null,
+        writable: false
+      });
+    } catch (e) {
+      // FileList constructor not available, try alternative approach
+      try {
+        // Create a new file input element and copy its empty files
+        const tempInput = document.createElement('input');
+        tempInput.type = 'file';
+        Object.defineProperty(input, 'files', {
+          value: tempInput.files,
+          writable: false
+        });
+      } catch (e2) {
+        logger.log('Could not modify files property, relying on other methods');
+      }
+    }
+
+    // Method 3: Dispatch change event to notify the app that the file was removed
+    const changeEvent = new Event('change', { bubbles: true });
+    input.dispatchEvent(changeEvent);
+
+    // Method 4: Try to prevent form submission if we can find the form
+    const form = input.closest('form');
+    if (form) {
+      const preventSubmit = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        logger.log('Prevented form submission due to secrets in PDF');
+        return false;
+      };
+      
+      // Add temporary listener to prevent submission
+      form.addEventListener('submit', preventSubmit, { once: true, capture: true });
+      
+      // Remove the listener after 30 seconds to avoid permanent blocking
+      setTimeout(() => {
+        form.removeEventListener('submit', preventSubmit, { capture: true });
+      }, 30000);
+    }
+
+    // Method 5: Try to remove any visible file attachments from the UI
+    setTimeout(() => {
+      try {
+        const attachments = document.querySelectorAll('[data-testid="attachment"]');
+        attachments.forEach(attachment => {
+          if (attachment.textContent && attachment.textContent.includes(file.name)) {
+            logger.log('Removing file attachment from UI:', file.name);
+            attachment.remove();
+          }
+        });
+      } catch (e) {
+        logger.error('Error removing file attachment from UI', e);
+      }
+    }, 100);
+
+    logger.log('Cleared file input after detecting secrets');
+  } catch (error) {
+    logger.error('Error preventing file upload', { error: error.message, filename: file.name });
+  }
+}
+
+/**
  * Check for ChatGPT-specific file upload elements
  */
 function checkForChatGPTFileElements() {
@@ -262,36 +389,7 @@ function setupDragAndDropMonitoring() {
 
           // Process each dropped PDF file
           pdfFiles.forEach((file) => {
-            // Show scanning indicator to user
-            this.ui.showScanningIndicator(file.name);
-
-            // Immediate scan of the PDF
-            this.scanPDFImmediately(file)
-              .then((result) => {
-                logger.log('Immediate scan result for dropped file:', result);
-
-                if (result.secrets) {
-                  // If secrets found, show warning
-                  this.ui.showSecretWarning(file.name, result);
-                } else if (result.action === 'warn' || result.extractionError || result.note === 'PDF parsing failed') {
-                  // If parsing failed or other warnings, show ONLY modal warning (not indicator)
-                  logger.log('PDF scan completed with warnings:', result.note || 'Unknown warning');
-                  this.ui.showParsingWarning(file.name, result);
-                } else {
-                  // Only show safe indicator if no secrets AND no warnings/errors
-                  this.ui.showSafeFileIndicator(file.name);
-                }
-              })
-              .catch((error) => {
-                logger.error('Error during immediate scan of dropped PDF', error);
-                this.ui.showParsingWarning(file.name, { 
-                  note: `Scan error: ${error.message}`,
-                  extractionError: true 
-                });
-              });
-
-            // Also track the upload through our normal channels as backup
-            this.trackUpload(file);
+            this.processPDFFile(file);
           });
         }
       }
@@ -331,36 +429,7 @@ function setupClipboardMonitoring() {
 
           // Process each pasted PDF file
           pdfFiles.forEach((file) => {
-            // Show scanning indicator to user
-            this.ui.showScanningIndicator(file.name);
-
-            // Immediate scan of the PDF
-            this.scanPDFImmediately(file)
-              .then((result) => {
-                logger.log('Immediate scan result for pasted file:', result);
-
-                if (result.secrets) {
-                  // If secrets found, show warning
-                  this.ui.showSecretWarning(file.name, result);
-                } else if (result.action === 'warn' || result.extractionError || result.note === 'PDF parsing failed') {
-                  // If parsing failed or other warnings, show ONLY modal warning (not indicator)
-                  logger.log('PDF scan completed with warnings:', result.note || 'Unknown warning');
-                  this.ui.showParsingWarning(file.name, result);
-                } else {
-                  // Only show safe indicator if no secrets AND no warnings/errors
-                  this.ui.showSafeFileIndicator(file.name);
-                }
-              })
-              .catch((error) => {
-                logger.error('Error during immediate scan of pasted PDF', error);
-                this.ui.showParsingWarning(file.name, { 
-                  note: `Scan error: ${error.message}`,
-                  extractionError: true 
-                });
-              });
-
-            // Also track the upload through our normal channels as backup
-            this.trackUpload(file);
+            this.processPDFFile(file);
           });
         }
       }
@@ -482,109 +551,12 @@ function handleFileInputChange(event) {
       names: pdfFiles.map((f) => f.name),
     });
 
-    // IMMEDIATE SCAN: Scan PDFs right at selection time, before any HTTP request
+    // Process each selected PDF file
     pdfFiles.forEach((file) => {
-      // Show scanning indicator to user immediately
-      this.ui.showScanningIndicator(file.name);
-
-      // Immediate scan of the PDF
-      this.scanPDFImmediately(file)
-        .then((result) => {
-          logger.log('Immediate scan result:', result);
-
-          if (result.secrets) {
-            // If secrets found, show warning and prevent upload
-            this.ui.showSecretWarning(file.name, result);
-
-            // Try multiple methods to prevent the upload
-            try {
-              // Method 1: Clear the file input
-              input.value = '';
-
-              // Method 2: Try to clear the files property (may not work in all browsers)
-              try {
-                Object.defineProperty(input, 'files', {
-                  value: null,
-                  writable: false
-                });
-              } catch (e) {
-                // FileList constructor not available, try alternative approach
-                try {
-                  // Create a new file input element and copy its empty files
-                  const tempInput = document.createElement('input');
-                  tempInput.type = 'file';
-                  Object.defineProperty(input, 'files', {
-                    value: tempInput.files,
-                    writable: false
-                  });
-                } catch (e2) {
-                  logger.log('Could not modify files property, relying on other methods');
-                }
-              }
-
-              // Method 3: Dispatch change event to notify the app that the file was removed
-              const changeEvent = new Event('change', { bubbles: true });
-              input.dispatchEvent(changeEvent);
-
-                             // Method 4: Try to prevent form submission if we can find the form
-               const form = input.closest('form');
-               if (form) {
-                 const preventSubmit = (e) => {
-                   e.preventDefault();
-                   e.stopPropagation();
-                   logger.log('Prevented form submission due to secrets in PDF');
-                   return false;
-                 };
-                 
-                 // Add temporary listener to prevent submission
-                 form.addEventListener('submit', preventSubmit, { once: true, capture: true });
-                 
-                 // Remove the listener after 30 seconds to avoid permanent blocking
-                 setTimeout(() => {
-                   form.removeEventListener('submit', preventSubmit, { capture: true });
-                 }, 30000);
-               }
-
-               // Method 5: Try to remove any visible file attachments from the UI
-               setTimeout(() => {
-                 try {
-                   const attachments = document.querySelectorAll('[data-testid="attachment"]');
-                   attachments.forEach(attachment => {
-                     if (attachment.textContent && attachment.textContent.includes(file.name)) {
-                       logger.log('Removing file attachment from UI:', file.name);
-                       attachment.remove();
-                     }
-                   });
-                 } catch (e) {
-                   logger.error('Error removing file attachment from UI', e);
-                 }
-               }, 100);
-
-               logger.log('Cleared file input after detecting secrets');
-            } catch (e) {
-              logger.error('Error clearing file input', e);
-            }
-          } else if (result.action === 'warn' || result.extractionError || result.note === 'PDF parsing failed') {
-            // If parsing failed or other warnings, show ONLY modal warning (not indicator)
-            logger.log('PDF scan completed with warnings:', result.note || 'Unknown warning');
-            this.ui.showParsingWarning(file.name, result);
-          } else {
-            // Only show safe indicator if no secrets AND no warnings/errors
-            logger.log('No secrets found, allowing upload to proceed');
-            this.ui.showSafeFileIndicator(file.name);
-          }
-        })
-        .catch((error) => {
-          logger.error('Error during immediate PDF scan', error);
-          // On error, show modal warning instead of indicator to prevent double alerts
-          this.ui.showParsingWarning(file.name, { 
-            note: `Scan error: ${error.message}`,
-            extractionError: true 
-          });
-        });
-
-      // Also track the upload through our normal channels as backup
-      this.trackUpload(file);
+      this.processPDFFile(file, {
+        preventUpload: true,
+        fileInput: input
+      });
     });
   } catch (error) {
     logger.error('Error handling file input change', { error: error.message });

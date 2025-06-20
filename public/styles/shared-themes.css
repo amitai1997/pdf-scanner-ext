@@ -91,12 +91,13 @@
 
 /* Modal Container - Modern card design */
 .pdf-scanner-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #fff;
-  padding: 20px;
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 0 auto;
+  background: var(--pdf-scanner-white);
+  padding: 24px;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   max-width: 500px;
@@ -200,14 +201,21 @@
 /* Indicators */
 .pdf-scanner-indicator {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 12px 20px;
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  top: var(--pdf-scanner-space-5);
+  right: var(--pdf-scanner-space-5);
+  padding: var(--pdf-scanner-space-4) var(--pdf-scanner-space-5);
+  border-radius: var(--pdf-scanner-radius-lg);
+  box-shadow: var(--pdf-scanner-shadow-lg);
+  z-index: var(--pdf-scanner-z-notification);
+  max-width: 320px;
+  min-width: 0;
+  font-family: var(--pdf-scanner-font-family);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--pdf-scanner-space-3);
+  border: 1px solid;
   font-size: 14px;
-  max-width: 300px;
-  z-index: 9999;
+  line-height: 1.5;
   animation: slideIn 0.3s ease-out;
 }
 
@@ -222,22 +230,213 @@
   }
 }
 
-/* Close Button */
-.pdf-scanner-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: inherit;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+.pdf-scanner-indicator.pdf-scanner-error-bg {
+  background: var(--pdf-scanner-error-bg);
+  border-color: var(--pdf-scanner-error-border);
+  color: var(--pdf-scanner-error-text);
 }
 
-.pdf-scanner-close:hover {
+.pdf-scanner-indicator.pdf-scanner-warning-bg {
+  background: var(--pdf-scanner-warning-bg);
+  border-color: var(--pdf-scanner-warning-border);
+  color: var(--pdf-scanner-warning-text);
+}
+
+.pdf-scanner-indicator.pdf-scanner-success-bg {
+  background: var(--pdf-scanner-success-bg);
+  border-color: var(--pdf-scanner-success-border);
+  color: var(--pdf-scanner-success-text);
+}
+
+.pdf-scanner-indicator.pdf-scanner-info-bg {
+  background: var(--pdf-scanner-info-bg);
+  border-color: var(--pdf-scanner-info-border);
+  color: var(--pdf-scanner-info-text);
+}
+
+/* Indicator Icon - Proper sizing */
+.pdf-scanner-indicator-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Indicator Close Button - Clean close */
+.pdf-scanner-indicator-close {
+  background: none;
+  border: none;
+  color: currentColor;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.pdf-scanner-indicator-close:hover {
   opacity: 1;
+}
+
+/* Spinner - Minimal loading indicator */
+.pdf-scanner-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid currentColor;
+  border-top: 2px solid transparent;
+  border-radius: var(--pdf-scanner-radius-full);
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-top: 1px;
+  animation: pdf-scanner-spin 1s linear infinite;
+}
+
+@keyframes pdf-scanner-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Findings Box - Clean findings display */
+.pdf-scanner-findings-box {
+  background: var(--pdf-scanner-neutral-light);
+  border: 1px solid var(--pdf-scanner-neutral-border);
+  border-radius: var(--pdf-scanner-radius-md);
+  padding: var(--pdf-scanner-space-4);
+  margin-top: var(--pdf-scanner-space-4);
+}
+
+.pdf-scanner-findings-title {
+  font-weight: 600;
+  margin-bottom: var(--pdf-scanner-space-3);
+  color: var(--pdf-scanner-text);
+  font-size: 14px;
+}
+
+.pdf-scanner-findings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pdf-scanner-space-2);
+}
+
+.pdf-scanner-finding-item {
+  padding: var(--pdf-scanner-space-2) var(--pdf-scanner-space-3);
+  background: var(--pdf-scanner-white);
+  border: 1px solid var(--pdf-scanner-neutral-border);
+  border-radius: var(--pdf-scanner-radius-sm);
+  font-size: 13px;
+  color: var(--pdf-scanner-text);
+  font-family: var(--pdf-scanner-font-mono);
+}
+
+/* Attachment Warning - Subtle indicator */
+.pdf-scanner-attachment-warning {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  background: var(--pdf-scanner-error);
+  color: white;
+  border-radius: var(--pdf-scanner-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--pdf-scanner-shadow-md);
+  border: 2px solid var(--pdf-scanner-white);
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .pdf-scanner-modal {
+    margin: var(--pdf-scanner-space-4);
+    max-width: none;
+  }
+  
+  .pdf-scanner-modal-header,
+  .pdf-scanner-modal-content {
+    padding: var(--pdf-scanner-space-4);
+  }
+  
+  .pdf-scanner-indicator {
+    top: var(--pdf-scanner-space-4);
+    right: var(--pdf-scanner-space-4);
+    left: var(--pdf-scanner-space-4);
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pdf-scanner-text: #f9fafb;
+    --pdf-scanner-text-muted: #9ca3af;
+    --pdf-scanner-white: #1f2937;
+    --pdf-scanner-neutral-light: #374151;
+    --pdf-scanner-neutral-border: #4b5563;
+    --pdf-scanner-overlay: rgba(0, 0, 0, 0.85);
+  }
+  
+  .pdf-scanner-findings-box {
+    background: var(--pdf-scanner-neutral-light);
+  }
+  
+  .pdf-scanner-finding-item {
+    background: var(--pdf-scanner-white);
+    color: var(--pdf-scanner-text);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .pdf-scanner-modal {
+    border: 2px solid var(--pdf-scanner-text);
+  }
+  
+  .pdf-scanner-indicator {
+    border-width: 2px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .pdf-scanner-spinner {
+    animation: none;
+  }
+  
+  .pdf-scanner-modal-close,
+  .pdf-scanner-indicator-close {
+    transition: none;
+  }
+}
+
+/* Focus Management */
+.pdf-scanner-modal-close:focus-visible,
+.pdf-scanner-indicator-close:focus-visible {
+  outline: 2px solid var(--pdf-scanner-info);
+  outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+  .pdf-scanner-modal-overlay,
+  .pdf-scanner-indicator,
+  .pdf-scanner-attachment-warning {
+    display: none !important;
+  }
+}
+
+/* Update existing modal styles to handle warnings */
+.pdf-scanner-modal.warning {
+  border-left: 4px solid #ffc107;
 }
 
 /* Modal Icon - Modern sizing */
@@ -507,16 +706,6 @@
 }
 
 /* Update existing modal styles to handle warnings */
-.pdf-scanner-modal {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  max-width: 500px;
-  width: 90%;
-  position: relative;
-}
-
 .pdf-scanner-modal.warning {
   border-left: 4px solid #ffc107;
 } 

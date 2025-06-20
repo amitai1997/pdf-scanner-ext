@@ -222,22 +222,8 @@ class PDFMonitor {
 
 // Assign watcher functions to PDFMonitor prototype
 PDFMonitor.prototype.startMonitoring = startMonitoring;
-PDFMonitor.prototype.checkForChatGPTFileElements = checkForChatGPTFileElements;
-PDFMonitor.prototype.addWarningIndicatorToAttachment = addWarningIndicatorToAttachment;
-PDFMonitor.prototype.setupDragAndDropMonitoring = setupDragAndDropMonitoring;
-PDFMonitor.prototype.setupClipboardMonitoring = setupClipboardMonitoring;
-PDFMonitor.prototype.monitorFileSelectionDialog = monitorFileSelectionDialog;
-PDFMonitor.prototype.stopMonitoring = stopMonitoring;
-PDFMonitor.prototype.scanForFileInputs = scanForFileInputs;
-PDFMonitor.prototype.setupFormSubmissionMonitoring = setupFormSubmissionMonitoring;
-PDFMonitor.prototype.handleFileInputChange = handleFileInputChange;
-PDFMonitor.prototype.handleFormSubmit = handleFormSubmit;
-PDFMonitor.prototype.handleButtonClick = handleButtonClick;
-PDFMonitor.prototype.trackUpload = trackUpload;
-
-// Assign other utility functions
-// Assign watcher functions to PDFMonitor prototype
-PDFMonitor.prototype.startMonitoring = startMonitoring;
+PDFMonitor.prototype.processPDFFile = processPDFFile;
+PDFMonitor.prototype.preventFileUpload = preventFileUpload;
 PDFMonitor.prototype.checkForChatGPTFileElements = checkForChatGPTFileElements;
 PDFMonitor.prototype.addWarningIndicatorToAttachment = addWarningIndicatorToAttachment;
 PDFMonitor.prototype.setupDragAndDropMonitoring = setupDragAndDropMonitoring;
