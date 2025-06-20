@@ -3,7 +3,7 @@
  * inspection service.
  */
 
-const PDF_CONSTANTS = {
+export const PDF_CONSTANTS = {
   // File size limits
   MAX_PDF_SIZE: 20 * 1024 * 1024, // 20MB
   MAX_PDF_SIZE_MB: 20,
@@ -25,7 +25,7 @@ const PDF_CONSTANTS = {
   CLEANUP_DELAY: 5 * 60 * 1000, // 5 minutes
 };
 
-const UI_CONSTANTS = {
+export const UI_CONSTANTS = {
   // Z-index values for consistent layering
   Z_INDEX: {
     WARNING_MODAL: 10000,
@@ -53,5 +53,8 @@ const UI_CONSTANTS = {
 
 // For CommonJS compatibility (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { PDF_CONSTANTS, UI_CONSTANTS };
+  module.exports = { 
+    PDF_CONSTANTS, 
+    UI_CONSTANTS
+  };
 } 

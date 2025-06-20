@@ -3,6 +3,8 @@
  * from various input formats.
  */
 
+import { PDF_CONSTANTS } from './constants.js';
+
 // PDF_CONSTANTS is loaded via manifest.json script order
 
 /**
@@ -10,7 +12,7 @@
  * @param {File|Blob|Object} file - File object or file-like object
  * @returns {boolean} - Whether the file is likely a PDF
  */
-function isPdfCandidate(file) {
+export function isPdfCandidate(file) {
   if (!file) return false;
   
   // Check MIME type
@@ -39,7 +41,7 @@ function isPdfCandidate(file) {
  * @param {any} body - Request body (FormData, Blob, File, string, etc.)
  * @returns {boolean} - Whether the body likely contains a PDF
  */
-function checkIfBodyContainsPDF(body) {
+export function checkIfBodyContainsPDF(body) {
   try {
     if (!body) return false;
     
@@ -79,7 +81,7 @@ function checkIfBodyContainsPDF(body) {
  * @param {string} headers - Headers section of a multipart part
  * @returns {boolean} - True if this part contains a PDF
  */
-function isPDFPart(headers) {
+export function isPDFPart(headers) {
   if (!headers) {
     return false;
   }
@@ -103,7 +105,7 @@ function isPDFPart(headers) {
  * @param {string} data - String to check
  * @returns {boolean} - Whether the string appears to be base64 PDF data
  */
-function isBase64PDF(data) {
+export function isBase64PDF(data) {
   if (!data || typeof data !== 'string' || data.length < 10) {
     return false;
   }
@@ -136,7 +138,7 @@ function isBase64PDF(data) {
  * @param {number} size - File size in bytes
  * @returns {boolean} - Whether the file is too large
  */
-function isFileTooLarge(size) {
+export function isFileTooLarge(size) {
   return size > PDF_CONSTANTS.MAX_PDF_SIZE;
 }
 
@@ -145,7 +147,7 @@ function isFileTooLarge(size) {
  * @param {any} body - Request body (FormData, Blob, File, string, etc.)
  * @returns {Promise<Object|null>} - PDF data or null
  */
-async function extractPDFFromBody(body) {
+export async function extractPDFFromBody(body) {
   try {
     if (!body) return null;
     
@@ -216,7 +218,7 @@ function _fileToDataURL(file) {
  * @param {string} headers - Headers section of a multipart part
  * @returns {string|null} - Filename or null if not found
  */
-function extractFilename(headers) {
+export function extractFilename(headers) {
   if (!headers) {
     return null;
   }
