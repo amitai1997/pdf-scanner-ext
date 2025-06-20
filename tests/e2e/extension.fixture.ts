@@ -1,9 +1,16 @@
 import { test as base, chromium, BrowserContext } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXT_PATH = path.join(__dirname, '../..');
+
+// Create a dummy unreadable.pdf for tests
+const unreadablePdfPath = path.join(__dirname, 'fixtures', 'unreadable.pdf');
+if (!fs.existsSync(unreadablePdfPath)) {
+  fs.writeFileSync(unreadablePdfPath, 'This is not a PDF.');
+}
 
 function hookLogs(target: any) {
   target.on('console', (msg: any) => {
@@ -57,6 +64,13 @@ export const test = base.extend<{
       
       if (extensionWorker) {
         extensionId = extensionWorker.url().split('/')[2];
+        await extensionWorker.evaluate(
+          (url) => {
+            // @ts-ignore
+            self.E2E_TEST_API_URL = url;
+          },
+          ['http://localhost:3333']
+        );
         break;
       }
       

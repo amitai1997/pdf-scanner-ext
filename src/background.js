@@ -58,7 +58,7 @@ class PDFScannerBackground {
   constructor() {
     // Configuration for local backend service
     this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4';
-    this.API_URL = 'http://localhost:3001/scan';
+    this.API_URL = (self.E2E_TEST_API_URL || 'http://localhost:3001') + '/scan';
     this.scanQueue = new Map();
     this.scanStats = {
       scanCount: 0,
