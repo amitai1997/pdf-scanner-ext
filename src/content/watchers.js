@@ -66,12 +66,9 @@ function processPDFFile(file, options = {}) {
           if (options.preventUpload && options.fileInput) {
             this.preventFileUpload(options.fileInput, file);
           }
-        } else if (result.extractionError || result.note === 'PDF parsing failed') {
-          // Parsing failed: show scan error indicator
-          logger.log('PDF parsing failed – showing scan error indicator');
-          this.ui.showScanErrorIndicator(file.name, 'No text could be extracted from this file.');
-        } else if (result.action === 'warn') {
-          // Generic warn actions (e.g. large file, partial scan) – show modal for more detail
+        } else if (result.extractionError || result.note === 'PDF parsing failed' || result.action === 'warn') {
+          // Parsing failed or other warnings: show parsing warning modal for user to acknowledge
+          logger.log('PDF parsing failed or warning detected – showing parsing warning modal');
           this.ui.showParsingWarning(file.name, result);
         } else {
           // Only show safe indicator if no secrets AND no warnings/errors
