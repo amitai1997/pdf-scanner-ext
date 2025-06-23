@@ -11,17 +11,16 @@ class FormDataParser {
   /**
    * Supported PDF MIME types for detection
    */
-  static PDF_MIME_TYPES = [
-    'application/pdf',
-    'application/x-pdf',
-    'application/acrobat',
-    'application/vnd.pdf',
-  ];
-  
+  static get PDF_MIME_TYPES() {
+    return PDF_CONSTANTS.PDF_MIME_TYPES;
+  }
+
   /**
    * Maximum PDF size to process (20MB)
    */
-  static MAX_PDF_SIZE = 20 * 1024 * 1024;
+  static get MAX_PDF_SIZE() {
+    return PDF_CONSTANTS.MAX_PDF_SIZE;
+  }
   
   /**
    * Extract PDF data from multipart/form-data request with boundary
@@ -195,22 +194,10 @@ class FormDataParser {
    * @returns {boolean} - True if this part contains a PDF
    */
   static isPDFPart(headers) {
-    if (!headers) {
-      return false;
+    if (typeof self.isPDFPart === 'function') {
+      return self.isPDFPart(headers);
     }
-    
-    // Check for PDF content type
-    const isPDFContentType = this.PDF_MIME_TYPES.some(type => 
-      headers.toLowerCase().includes(`content-type: ${type}`)
-    );
-    
-    if (isPDFContentType) {
-      return true;
-    }
-    
-    // Check for filename with .pdf extension
-    const filenameMatch = headers.match(/filename=["']?([^"']*\.pdf)["']?/i);
-    return !!filenameMatch;
+    return false;
   }
   
   /**
@@ -233,30 +220,9 @@ class FormDataParser {
    * @returns {boolean} - True if likely a base64 PDF
    */
   static isBase64PDF(data) {
-    if (typeof data !== 'string') {
-      return false;
+    if (typeof self.isBase64PDF === 'function') {
+      return self.isBase64PDF(data);
     }
-    
-    // Check for data URL format
-    if (data.startsWith('data:application/pdf;base64,')) {
-      return true;
-    }
-    
-    // Check for plain base64 with PDF magic number
-    if (data.length > 100) {
-      try {
-        // PDF magic number is "%PDF-" which in base64 often starts with "JVB"
-        // This is a heuristic and may produce false positives
-        if (data.startsWith('JVB')) {
-          const sample = atob(data.substring(0, 8));
-          return sample.startsWith('%PDF-');
-        }
-      } catch (e) {
-        // Not valid base64
-        return false;
-      }
-    }
-    
     return false;
   }
   

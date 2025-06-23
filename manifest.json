@@ -45,7 +45,6 @@
         "src/shared/logger.js",
         "src/shared/pdfDetection.js",
         "src/content/logger.js",
-        "src/content/constants.js",
         "src/content/domHelpers.js",
         "src/content/pdfInterceptor.js",
         "src/ui/PDFMonitorUI.js",
