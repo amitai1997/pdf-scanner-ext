@@ -132,39 +132,6 @@ export function fromFetchError(fetchError, response = null) {
 }
 
 /**
- * Express error handler middleware
- * @param {Error} err - Error object
- * @param {Object} req - Express request
- * @param {Object} res - Express response
- * @param {Function} next - Next middleware
- */
-export function expressErrorHandler(err, req, res, next) {
-  // Import logger dynamically to avoid circular dependencies
-  const logger = require('./logger.js').serviceLogger || console;
-  
-  // Log the error
-  logger.error('Error:', err.message);
-  if (err.stack) {
-    logger.error(err.stack);
-  }
-  
-  let response;
-  if (err instanceof AppError) {
-    response = err.toResponse();
-  } else {
-    // Convert generic error to AppError format
-    response = createErrorResponse(
-      err.message || 'Internal Server Error',
-      err.statusCode || 500,
-      err.code || 'INTERNAL_ERROR'
-    );
-  }
-  
-  // Send response
-  res.status(response.error.status).json(response);
-}
-
-/**
  * Chrome extension message error handler
  * @param {Error} error - Error object
  * @param {Function} sendResponse - Chrome sendResponse function
@@ -208,7 +175,7 @@ export const ERROR_CODES = {
   SCAN_TIMEOUT: 'SCAN_TIMEOUT',
 };
 
-// For CommonJS compatibility (Node.js)
+// For CommonJS compatibility (extension contexts)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     AppError,
@@ -216,7 +183,6 @@ if (typeof module !== 'undefined' && module.exports) {
     createSuccessResponse,
     fromChromeError,
     fromFetchError,
-    expressErrorHandler,
     chromeMessageErrorHandler,
     ERROR_CODES,
   };
