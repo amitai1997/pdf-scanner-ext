@@ -300,7 +300,7 @@ if (!self.logger) {
         } else {
           console.log(`[PDF Scanner] ${message}`);
         }
-      } catch (e) {
+      } catch {
         // Ignore logging errors
       }
     },
@@ -312,7 +312,7 @@ if (!self.logger) {
         } else {
           console.warn(`[PDF Scanner] WARNING: ${message}`);
         }
-      } catch (e) {
+      } catch {
         // Ignore logging errors
       }
     },
@@ -324,7 +324,7 @@ if (!self.logger) {
         } else {
           console.error(`[PDF Scanner] ERROR: ${message}`);
         }
-      } catch (e) {
+      } catch {
         // Ignore logging errors
       }
     }

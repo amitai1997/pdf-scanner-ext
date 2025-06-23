@@ -35,7 +35,41 @@ export default [
         FileReader: 'readonly',
         Promise: 'readonly',
         setTimeout: 'readonly',
-        clearTimeout: 'readonly'
+        clearTimeout: 'readonly',
+        // Browser APIs
+        atob: 'readonly',
+        btoa: 'readonly',
+        Blob: 'readonly',
+        File: 'readonly',
+        Event: 'readonly',
+        MutationObserver: 'readonly',
+        Node: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        // Service Worker globals
+        self: 'readonly',
+        importScripts: 'readonly',
+        // Extension globals (defined by script loading order)
+        logger: 'readonly',
+        extensionLogger: 'readonly',
+        PDF_CONSTANTS: 'readonly',
+        isPdfCandidate: 'readonly',
+        checkIfBodyContainsPDF: 'readonly',
+        isBase64PDF: 'readonly',
+        isFileTooLarge: 'readonly',
+        PDFMonitor: 'readonly',
+        PDFMonitorUI: 'readonly',
+        PDFInterceptor: 'readonly',
+        loadSharedCSS: 'readonly',
+        showStandaloneError: 'readonly',
+        removeExistingIndicators: 'readonly',
+        removeExistingSecurityWarnings: 'readonly',
+        FormDataParser: 'readonly',
+        // Node.js/CommonJS
+        module: 'readonly',
+        require: 'readonly'
       },
       ecmaVersion: 2022,
       sourceType: 'module'

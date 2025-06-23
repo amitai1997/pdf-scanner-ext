@@ -3,6 +3,7 @@
   "name": "PDF Scanner (Alpha)",
   "description": "Scans selected PDFs for secrets and policy violations via Prompt Security API.",
   "version": "0.3.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx1cSfZh7xF2YzJhHgNJ8tPqkLDM2FkJ3MnO1xH9XzQ6Y",
 
   "action": {
     "default_title": "Scan PDF",
@@ -59,7 +60,8 @@
       "resources": [
         "src/shared/constants.js",
         "src/shared/logger.js",
-        "src/shared/pdfDetection.js"
+        "src/shared/pdfDetection.js",
+        "public/styles/shared-themes.css"
       ],
       "matches": [
         "https://eu.prompt.security/*",

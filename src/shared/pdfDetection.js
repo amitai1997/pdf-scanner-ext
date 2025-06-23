@@ -11,7 +11,7 @@
  * @returns {boolean} - Whether the file is likely a PDF
  */
 function isPdfCandidate(file) {
-  if (!file) return false;
+  if (!file) {return false;}
   
   // Check MIME type
   if (file.type && PDF_CONSTANTS.PDF_MIME_TYPES.includes(file.type)) {
@@ -41,7 +41,7 @@ function isPdfCandidate(file) {
  */
 function checkIfBodyContainsPDF(body) {
   try {
-    if (!body) return false;
+    if (!body) {return false;}
     
     // If it's a string, check for PDF indicators
     if (typeof body === 'string') {
@@ -54,7 +54,7 @@ function checkIfBodyContainsPDF(body) {
     // If it's FormData, check its entries
     if (body instanceof FormData) {
       let hasPDF = false;
-      body.forEach((value, key) => {
+      body.forEach((value) => {
         if (isPdfCandidate(value)) {
           hasPDF = true;
         }
@@ -122,7 +122,7 @@ function isBase64PDF(data) {
         const sample = atob(data.substring(0, 8));
         return sample.startsWith('%PDF-');
       }
-    } catch (e) {
+    } catch {
       // Not valid base64
       return false;
     }
@@ -147,12 +147,12 @@ function isFileTooLarge(size) {
  */
 async function extractPDFFromBody(body) {
   try {
-    if (!body) return null;
+    if (!body) {return null;}
     
     // Handle FormData
     if (body instanceof FormData) {
       let pdfFile = null;
-      body.forEach((value, key) => {
+      body.forEach((value) => {
         if (value instanceof File && isPdfCandidate(value)) {
           pdfFile = value;
         }

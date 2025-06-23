@@ -39,10 +39,10 @@ class PDFScannerPopup {
     this.devBadgeContainer = document.getElementById('dev-badge-container');
     
     // Log if any elements are missing
-    if (!this.statusIndicator) logger.error('Missing element: #status-indicator');
-    if (!this.statusText) logger.error('Missing element: .status-text');
-    if (!this.scanCountElement) logger.error('Missing element: #scan-count');
-    if (!this.devBadgeContainer && this.checkDevelopment && this.checkDevelopment()) logger.warn('Dev badge container missing (dev mode only)');
+    if (!this.statusIndicator) {logger.error('Missing element: #status-indicator');}
+    if (!this.statusText) {logger.error('Missing element: .status-text');}
+    if (!this.scanCountElement) {logger.error('Missing element: #scan-count');}
+    if (!this.devBadgeContainer && this.checkDevelopment && this.checkDevelopment()) {logger.warn('Dev badge container missing (dev mode only)');}
   }
   
   /**
@@ -98,7 +98,7 @@ class PDFScannerPopup {
   checkDevelopmentMode() {
     try {
       const manifest = chrome.runtime.getManifest();
-      if (!manifest) return false;
+      if (!manifest) {return false;}
       
       // Check for development indicators
       const isDev = manifest.version_name && manifest.version_name.toLowerCase().includes('dev');

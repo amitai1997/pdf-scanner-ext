@@ -378,7 +378,7 @@ class PDFScannerBackground {
           } else {
             throw new Error('JSON data does not contain PDF data');
           }
-        } catch (e) {
+        } catch {
           throw new Error('Invalid PDF data format');
         }
       } else {
@@ -390,7 +390,7 @@ class PDFScannerBackground {
             bytes[i] = binaryString.charCodeAt(i);
           }
           blob = new Blob([bytes], { type: 'application/pdf' });
-        } catch (e) {
+        } catch {
           throw new Error('Invalid PDF data format');
         }
       }
