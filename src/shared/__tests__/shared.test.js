@@ -2,20 +2,11 @@
  * Unit tests for the shared utility modules.
  */
 
-import { 
-  PDF_CONSTANTS, 
-  UI_CONSTANTS,
-  isPdfCandidate,
-  checkIfBodyContainsPDF,
-  isBase64PDF,
-  isFileTooLarge,
-  computeHashBrowser,
-  createSimpleLogger,
-  AppError,
-  createErrorResponse,
-  createSuccessResponse,
-  ERROR_CODES 
-} from '../index.js';
+import { PDF_CONSTANTS, UI_CONSTANTS } from '../constants.js';
+import { isPdfCandidate, checkIfBodyContainsPDF, isBase64PDF, isFileTooLarge } from '../pdfDetection.js';
+import { computeHashBrowser } from '../hashUtils.js';
+import { createSimpleLogger } from '../logger.js';
+import { AppError, createErrorResponse, createSuccessResponse, ERROR_CODES } from '../errors.js';
 
 describe('PDF Scanner Shared Utilities', () => {
   
