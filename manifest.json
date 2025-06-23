@@ -46,8 +46,7 @@
         "src/content/logger.js",
         "src/content/constants.js",
         "src/content/domHelpers.js",
-        "src/content/xhrFetchInterceptor.js",
-        "src/content/watchers.js",
+        "src/content/pdfInterceptor.js",
         "src/ui/PDFMonitorUI.js",
         "src/content/pdfMonitor.js",
         "src/content/index.js"
