@@ -7,10 +7,13 @@
 importScripts('./shared/constants.js', './shared/pdfDetection.js', './shared/logger.js');
 
 // Use the shared extension logger
-const logger = self.extensionLogger || console;
+defineLogger();
 
-// Make logger available globally
-self.logger = logger;
+function defineLogger() {
+  // Use the global extensionLogger if available, otherwise fallback to console
+  const logger = self.extensionLogger || console;
+  self.logger = logger;
+}
 
 // Import utility scripts in the correct order
 importScripts('./utils/formDataParser.js');

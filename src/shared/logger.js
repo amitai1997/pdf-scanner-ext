@@ -1,6 +1,6 @@
 /**
- * Environment-aware logger with level filtering
- * for both Node and browser contexts.
+ * Extension-aware logger with level filtering
+ * for browser extension contexts (content scripts, background, popup, service workers).
  */
 
 const LOG_LEVELS = {
@@ -11,25 +11,19 @@ const LOG_LEVELS = {
 };
 
 /**
- * Universal logger class that adapts to different environments
+ * Extension logger class for browser extension contexts
  */
 class Logger {
   constructor(options = {}) {
     const {
       level = 'info',
-      serviceName = 'PDF-Scanner',
       prefix = '[PDF Scanner]',
       enableColors = true,
     } = options;
     
     this.level = LOG_LEVELS[level] || LOG_LEVELS.info;
-    this.serviceName = serviceName;
     this.prefix = prefix;
     this.enableColors = enableColors;
-    
-    // Detect environment
-    this.isNode = typeof require !== 'undefined' && typeof window === 'undefined';
-    this.isBrowser = typeof window !== 'undefined';
   }
 
   /**
@@ -41,27 +35,16 @@ class Logger {
   }
 
   /**
-   * Format log message with timestamp and level
+   * Format log message with prefix and level
    * @param {string} level - Log level
    * @param {string} message - Log message
-   * @param {any} data - Optional data to log
    * @returns {string} Formatted message
    */
-  formatMessage(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    let prefix;
-    
-    if (this.isNode) {
-      // Node.js format with service name
-      prefix = `${timestamp} [${this.serviceName}] [${level.toUpperCase()}]`;
-    } else {
-      // Browser format with simple prefix
-      prefix = `${this.prefix}`;
-      if (level !== 'info') {
-        prefix += ` ${level.toUpperCase()}:`;
-      }
+  formatMessage(level, message) {
+    let prefix = this.prefix;
+    if (level !== 'info') {
+      prefix += ` ${level.toUpperCase()}:`;
     }
-    
     return `${prefix} ${message}`;
   }
 
@@ -139,17 +122,6 @@ class Logger {
   }
 
   /**
-   * Log an HTTP request (Node.js specific)
-   * @param {Object} req - Express request object
-   */
-  logRequest(req) {
-    if (this.isNode && this.level >= LOG_LEVELS.info) {
-      const message = `${req.method} ${req.originalUrl}`;
-      this.info(message);
-    }
-  }
-
-  /**
    * Log scan operation (PDF Scanner specific)
    * @param {string} filename - PDF filename
    * @param {number} size - File size
@@ -184,17 +156,11 @@ function createSimpleLogger(options = {}) {
 }
 
 /**
- * Default logger instances for different contexts
+ * Default logger instance for extension contexts
  */
 const extensionLogger = createSimpleLogger({
   prefix: '[PDF Scanner]',
   level: 'info'
-});
-
-const serviceLogger = new Logger({
-  serviceName: 'PDF-Scanner-Service',
-  level: (typeof process !== 'undefined' && process?.env?.LOG_LEVEL) || 
-         (typeof process !== 'undefined' && process?.env?.NODE_ENV === 'development' ? 'debug' : 'info')
 });
 
 // Create global logger for browser content scripts
@@ -212,12 +178,11 @@ if (typeof self !== 'undefined' && typeof importScripts !== 'undefined') {
   self.extensionLogger = extensionLogger;
 }
 
-// For CommonJS compatibility (Node.js)
+// For CommonJS compatibility (extension contexts)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     Logger,
     createSimpleLogger,
     extensionLogger,
-    serviceLogger,
   };
 } 
