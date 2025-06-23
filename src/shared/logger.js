@@ -197,6 +197,15 @@ const serviceLogger = new Logger({
          (typeof process !== 'undefined' && process?.env?.NODE_ENV === 'development' ? 'debug' : 'info')
 });
 
+// Create global logger for browser content scripts
+if (typeof window !== 'undefined') {
+  // Browser environment - create global logger instance
+  window.logger = createSimpleLogger({
+    prefix: '[PDF Scanner]',
+    level: 'info'
+  });
+}
+
 // For CommonJS compatibility (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
