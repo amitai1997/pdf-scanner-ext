@@ -57,9 +57,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "public/styles/*.css",
-        "public/assets/*",
-        "src/shared/*"
+        "src/shared/constants.js",
+        "src/shared/logger.js",
+        "src/shared/pdfDetection.js"
       ],
       "matches": [
         "https://eu.prompt.security/*",
