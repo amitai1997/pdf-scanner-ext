@@ -47,10 +47,6 @@ self.logger = logger;
 
 // Import utility scripts in the correct order
 importScripts('./utils/formDataParser.js');
-importScripts('./utils/interceptor.js');
-
-// Access the interceptor from the global scope
-const interceptor = self.interceptor;
 
 logger.log('PDF Scanner service worker loaded');
 
@@ -77,10 +73,6 @@ class PDFScannerBackground {
   }
 
   init() {
-    // Initialize the interceptor
-    if (interceptor) {
-      interceptor.init();
-    }
     this.loadScanStats();
     this.setupDailyCounterReset();
     this.bindEvents();
