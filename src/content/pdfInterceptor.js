@@ -266,7 +266,7 @@ function setupDragAndDropMonitoring() {
 
       if (event.dataTransfer && event.dataTransfer.files) {
         const files = Array.from(event.dataTransfer.files);
-        const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+        const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
         if (pdfFiles.length > 0) {
           logger.log('PDF files dropped', {
@@ -318,7 +318,7 @@ function setupClipboardMonitoring() {
     document.addEventListener('paste', (event) => {
       if (event.clipboardData && event.clipboardData.files) {
         const files = Array.from(event.clipboardData.files);
-        const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+        const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
         if (pdfFiles.length > 0) {
           logger.log('PDF files pasted from clipboard', {
@@ -471,7 +471,7 @@ function handleFileInputChange(event) {
     const files = Array.from(input.files || []);
 
     // Filter for PDF files using shared logic
-    const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+    const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
     if (pdfFiles.length === 0) {
       return;
@@ -554,7 +554,7 @@ function handleFormSubmit(event) {
 
     fileInputs.forEach((input) => {
       const files = Array.from(input.files || []);
-      hasPDF = hasPDF || files.some((file) => PDFMonitor._isPdfCandidate(file));
+      hasPDF = hasPDF || files.some((file) => isPdfCandidate(file));
     });
 
     if (hasPDF) {
