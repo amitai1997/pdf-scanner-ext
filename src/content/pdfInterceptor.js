@@ -572,7 +572,7 @@ function handleFormSubmit(event) {
 
     if (hasPDF) {
       logger.log('Form submitted with PDF files');
-      // Form submission is tracked by the webRequest API
+      // PDF interception happens via DOM events before upload
     }
   } catch (error) {
     logger.error('Error handling form submission', { error: error.message });
@@ -604,7 +604,7 @@ function handleButtonClick(event) {
         ariaLabel: button.getAttribute('aria-label'),
       });
 
-      // Note: actual upload interception happens via webRequest
+      // Note: PDFs are scanned immediately upon selection in DOM events
     }
   } catch (error) {
     logger.error('Error handling button click', { error: error.message });
@@ -636,8 +636,7 @@ function trackUpload(file) {
       timestamp: Date.now(),
     });
 
-    // Try to read the file and send it to the background script
-    // This is a backup method in case the webRequest API doesn't catch it
+    // Read the file and send it to the background script for scanning
     try {
       const reader = new FileReader();
       reader.onload = () => {

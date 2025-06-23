@@ -4,7 +4,7 @@
  */
 
 // Load shared utilities
-importScripts('./shared/constants.js', './utils/formDataParser.js', './shared/pdfDetection.js', './shared/logger.js');
+importScripts('./shared/constants.js', './shared/pdfDetection.js', './shared/logger.js');
 
 // Use the shared extension logger
 defineLogger();
@@ -272,7 +272,7 @@ class PDFScannerBackground {
   }
 
   /**
-   * Handle a PDF intercepted from webRequest
+   * Handle a PDF intercepted from DOM events
    * @param {Object} message - Message with PDF data
    * @returns {Object} - Scan result
    */
@@ -556,34 +556,7 @@ class PDFScannerBackground {
     }
   }
 
-  /**
-   * Process a web request intercepted by the backup listener
-   * @param {Object} details - Request details
-   */
-  async processWebRequest(details) {
-    try {
-      logger.log('Processing intercepted web request', details.url);
-      // Extract PDF from the request using the high-level API
-      const pdfData = await extractPDFFromRequest(details);
-      
-      if (!pdfData) {
-        logger.log('No PDF found in intercepted web request');
-        return;
-      }
-      
-      logger.log(`PDF extracted from web request: ${pdfData.filename} (${pdfData.size} bytes)`);
-      
-      // Send the PDF for scanning (reuse handleInterceptedPDF logic)
-      await this.handleInterceptedPDF({
-        fileData: pdfData.data,
-        filename: pdfData.filename,
-        fileSize: pdfData.size,
-        requestId: details.requestId || `webreq-${Date.now()}`
-      });
-    } catch (error) {
-      logger.error('Error in processWebRequest:', error);
-    }
-  }
+
 
 
 

@@ -1,10 +1,9 @@
 /**
  * Heuristics for detecting and extracting PDF data
- * from various input formats.
+ * from DOM elements and File objects.
  */
 
 // PDF_CONSTANTS is loaded via manifest.json script order
-// FormDataParser is loaded before this script in service worker context
 
 /**
  * Check if a file is a PDF candidate based on various heuristics
@@ -142,96 +141,34 @@ function isFileTooLarge(size) {
 }
 
 /**
- * Extract PDF data from a request body
- * @param {any} body - Request body (FormData, Blob, File, string, ArrayBuffer, etc.)
- * @param {Object} options - Optional parameters like boundary for multipart data
+ * Extract PDF data from DOM File objects and FileList
+ * @param {File|FileList|Blob} input - File object(s) from DOM events
  * @returns {Promise<Object|null>} - PDF data or null
  */
-async function extractPDFFromBody(body, options = {}) {
+async function extractPDFFromDOM(input) {
   try {
-    if (!body) {return null;}
+    if (!input) {return null;}
     
-    // Handle ArrayBuffer with multipart data (from web requests)
-    if (body instanceof ArrayBuffer && options.boundary) {
-      const pdfData = FormDataParser.extractPDFFromMultipart(body, options.boundary);
-      if (pdfData) {
-        // Convert to the expected format
-        return {
-          filename: pdfData.filename,
-          size: pdfData.size,
-          data: await _blobToDataURL(pdfData.blob)
-        };
-      }
-    }
-    
-    // Handle ArrayBuffer with JSON data
-    if (body instanceof ArrayBuffer && !options.boundary) {
-      try {
-        const decoder = new TextDecoder('utf-8');
-        const jsonString = decoder.decode(body);
-        const jsonData = JSON.parse(jsonString);
-        const pdfData = FormDataParser.extractPDFFromJSON(jsonData);
-        if (pdfData) {
-          return {
-            filename: pdfData.filename,
-            size: pdfData.size,
-            data: await _blobToDataURL(pdfData.blob)
-          };
+    // Handle FileList (from file input or drag & drop)
+    if (input instanceof FileList) {
+      for (let i = 0; i < input.length; i++) {
+        const file = input[i];
+        if (isPdfCandidate(file)) {
+          return await _fileToDataURL(file);
         }
-             } catch {
-         // Not JSON, continue with other methods
-       }
-    }
-    
-    // Handle parsed JSON objects
-    if (typeof body === 'object' && body !== null && !(body instanceof FormData) && !(body instanceof Blob)) {
-      const pdfData = FormDataParser.extractPDFFromJSON(body);
-      if (pdfData) {
-        return {
-          filename: pdfData.filename,
-          size: pdfData.size,
-          data: await _blobToDataURL(pdfData.blob)
-        };
       }
+      return null;
     }
     
-    // Handle FormData
-    if (body instanceof FormData) {
-      let pdfFile = null;
-      body.forEach((value) => {
-        if (value instanceof File && isPdfCandidate(value)) {
-          pdfFile = value;
-        }
-      });
-      
-      if (pdfFile) {
-        return await _fileToDataURL(pdfFile);
-      }
-    }
-    
-    // Handle direct Blob/File
-    if ((body instanceof Blob && body.type === 'application/pdf') ||
-        (body instanceof File && isPdfCandidate(body))) {
-      return await _fileToDataURL(body);
-    }
-    
-    // Handle string with base64 PDF data
-    if (typeof body === 'string' && body.includes('data:application/pdf;base64,')) {
-      const match = body.match(/data:application\/pdf;base64,([^"'\s]+)/);
-      if (match && match[1]) {
-        const base64Data = match[1];
-        const size = Math.floor(base64Data.length * 0.75); // Rough size estimation
-        return {
-          filename: 'document.pdf',
-          size: size,
-          data: `data:application/pdf;base64,${base64Data}`
-        };
-      }
+    // Handle single File or Blob
+    if ((input instanceof File && isPdfCandidate(input)) ||
+        (input instanceof Blob && input.type === 'application/pdf')) {
+      return await _fileToDataURL(input);
     }
     
     return null;
   } catch (e) {
-    console.warn('[PDF Detection] Error extracting PDF from body:', e);
+    console.warn('[PDF Detection] Error extracting PDF from DOM:', e);
     return null;
   }
 }
@@ -257,20 +194,7 @@ function _fileToDataURL(file) {
   });
 }
 
-/**
- * Convert a Blob to data URL format (helper for FormDataParser integration)
- * @param {Blob} blob - Blob to convert
- * @returns {Promise<string>} - Data URL string
- * @private
- */
-function _blobToDataURL(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+
 
 /**
  * Extract filename from multipart part headers
@@ -291,32 +215,7 @@ function extractFilename(headers) {
   return null;
 }
 
-/**
- * Extract PDF data from web request details (convenience function for background script)
- * @param {Object} requestDetails - Chrome webRequest details object
- * @returns {Promise<Object|null>} - PDF data or null
- */
-async function extractPDFFromRequest(requestDetails) {
-  try {
-    if (!requestDetails.requestBody || !requestDetails.requestBody.raw || requestDetails.requestBody.raw.length === 0) {
-      return null;
-    }
-    
-    const buffer = requestDetails.requestBody.raw[0].bytes;
-    const contentType = requestDetails.requestHeaders?.find(h => h.name.toLowerCase() === 'content-type')?.value;
-    
-    // Extract boundary from content type if it's multipart
-    let boundary = null;
-    if (contentType && contentType.includes('multipart/form-data')) {
-      boundary = FormDataParser.extractBoundaryFromContentType(contentType);
-    }
-    
-    return await extractPDFFromBody(buffer, { boundary });
-  } catch (e) {
-    console.warn('[PDF Detection] Error extracting PDF from request:', e);
-    return null;
-  }
-}
+
 
 // For CommonJS compatibility (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
@@ -327,7 +226,6 @@ if (typeof module !== 'undefined' && module.exports) {
     isBase64PDF,
     isFileTooLarge,
     extractFilename,
-    extractPDFFromBody,
-    extractPDFFromRequest,
+    extractPDFFromDOM,
   };
 } 
