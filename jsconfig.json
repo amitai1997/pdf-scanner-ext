@@ -11,8 +11,7 @@
       "@shared": ["src/shared/index.js"],
       "@utils/*": ["src/utils/*"],
       "@public/*": ["public/*"]
-    },
-
+    }
   },
   "include": [
     "src/**/*",

@@ -378,7 +378,7 @@ class PDFScannerBackground {
           } else {
             throw new Error('JSON data does not contain PDF data');
           }
-        } catch (e) {
+        } catch {
           throw new Error('Invalid PDF data format');
         }
       } else {
@@ -390,7 +390,7 @@ class PDFScannerBackground {
             bytes[i] = binaryString.charCodeAt(i);
           }
           blob = new Blob([bytes], { type: 'application/pdf' });
-        } catch (e) {
+        } catch {
           throw new Error('Invalid PDF data format');
         }
       }
@@ -432,25 +432,52 @@ class PDFScannerBackground {
   }
 
   async showNotification(message) {
+    if (!message || typeof message !== 'object') {
+      logger.error('Invalid notification message:', message);
+      return;
+    }
+
     const { title, message: body } = message;
+    const notificationTitle = title || 'PDF Scanner';
+    const notificationMessage = body || 'Scan completed';
 
     try {
-      // Check if notifications are permitted
-      const notificationId = await chrome.notifications.create({
+      // Create notification options with all required fields
+      const notificationOptions = {
         type: 'basic',
-        iconUrl: 'icons/icon.png', // Correct path for Chrome extension
-        title: title || 'PDF Scanner',
-        message: body || 'Scan completed',
-      });
+        title: String(notificationTitle),
+        message: String(notificationMessage),
+        iconUrl: chrome.runtime.getURL('public/icons/icon16.png') // Use the valid icon file
+      };
 
-      logger.log('Notification shown:', notificationId);
+      logger.log('Creating notification with options:', JSON.stringify(notificationOptions));
+      logger.log('Options type check - type:', typeof notificationOptions.type, 'title:', typeof notificationOptions.title, 'message:', typeof notificationOptions.message);
 
-      // Auto-clear notification after 5 seconds
-      setTimeout(() => {
-        chrome.notifications.clear(notificationId);
-      }, 5000);
+      try {
+        const notificationId = await chrome.notifications.create(notificationOptions);
+        
+        logger.log('Notification shown:', notificationId);
+
+        // Auto-clear notification after 5 seconds
+        setTimeout(() => {
+          chrome.notifications.clear(notificationId);
+        }, 5000);
+      } catch (createError) {
+        logger.error('Error creating notification:', createError);
+        
+        if (chrome.runtime.lastError) {
+          logger.error('Chrome runtime error:', JSON.stringify(chrome.runtime.lastError));
+          logger.error('Error message:', chrome.runtime.lastError.message);
+        }
+      }
     } catch (error) {
       logger.error('Failed to show notification:', error);
+      
+      // Check for runtime.lastError
+      if (chrome.runtime.lastError) {
+        logger.error('Chrome runtime error:', JSON.stringify(chrome.runtime.lastError));
+        logger.error('Error message:', chrome.runtime.lastError.message);
+      }
     }
   }
 

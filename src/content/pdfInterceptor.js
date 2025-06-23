@@ -33,7 +33,7 @@ function startMonitoring() {
         this.scanForFileInputs();
 
         // Also check for ChatGPT-specific elements
-        this.checkForChatGPTFileElements();
+        checkForChatGPTFileElements.call(this);
       }
     });
 
@@ -47,7 +47,7 @@ function startMonitoring() {
     this.setupFormSubmissionMonitoring();
 
     // Check for ChatGPT-specific elements
-    this.checkForChatGPTFileElements();
+    checkForChatGPTFileElements.call(this);
 
     logger.log('Started monitoring for file inputs');
   } catch (error) {
@@ -80,11 +80,14 @@ function checkForChatGPTFileElements() {
               input._pdfScannerClickMonitored = true;
 
               // Create a MutationObserver to detect when files are added to this input
-              const observer = new MutationObserver((mutations) => {
+              const observer = new MutationObserver(() => {
                 if (input.files && input.files.length > 0) {
                   logger.log('Files added to input via ChatGPT UI');
                   // Manually trigger our handler
-                  this.handleFileInputChange({ target: input });
+                  // Get the correct context for handleFileInputChange
+                  if (window.pdfMonitorInstance && window.pdfMonitorInstance.interceptor) {
+                    window.pdfMonitorInstance.interceptor.handleFileInputChange({ target: input });
+                  }
                 }
               });
 
@@ -122,19 +125,23 @@ function checkForChatGPTFileElements() {
             ariaLabel: element.getAttribute('aria-label'),
           });
 
-          // Report to background script
-          this.sendMessage({
-            type: 'pdf_detected_in_ui',
-            details: {
-              text: element.textContent,
-              ariaLabel: element.getAttribute('aria-label'),
-            },
-          }).catch((err) => {
-            logger.error('Error reporting PDF in UI', err);
-          });
+          // Report to background script - get messageHandler from global context
+          if (window.pdfMonitorInstance && window.pdfMonitorInstance.sendMessage) {
+            window.pdfMonitorInstance.sendMessage({
+              type: 'pdf_detected_in_ui',
+              details: {
+                text: element.textContent,
+                ariaLabel: element.getAttribute('aria-label'),
+              },
+            }).catch((err) => {
+              logger.error('Error reporting PDF in UI', err);
+            });
+          } else {
+            logger.warn('PDF Monitor not available for sending message');
+          }
 
           // Add a warning indicator to the attachment element
-          this.addWarningIndicatorToAttachment(element);
+          addWarningIndicatorToAttachment(element);
         }
       }
     });
@@ -154,10 +161,11 @@ function checkForChatGPTFileElements() {
 
         // Find any file inputs inside the dialog
         const fileInputs = dialog.querySelectorAll('input[type="file"]');
+        const self = this;
         fileInputs.forEach((input) => {
-          if (!this.fileInputs.has(input)) {
-            this.fileInputs.add(input);
-            input.addEventListener('change', this.handleFileInputChange.bind(this));
+          if (!self.fileInputs.has(input)) {
+            self.fileInputs.add(input);
+            input.addEventListener('change', self.handleFileInputChange.bind(self));
             logger.log('Added event listener to file input in dialog');
           }
         });
@@ -176,9 +184,9 @@ function checkForChatGPTFileElements() {
                   if (newInputs.length > 0) {
                     logger.log('New file inputs added to dialog');
                     newInputs.forEach((input) => {
-                      if (!this.fileInputs.has(input)) {
-                        this.fileInputs.add(input);
-                        input.addEventListener('change', this.handleFileInputChange.bind(this));
+                      if (!self.fileInputs.has(input)) {
+                        self.fileInputs.add(input);
+                        input.addEventListener('change', self.handleFileInputChange.bind(self));
                         logger.log('Added event listener to new file input in dialog');
                       }
                     });
@@ -230,10 +238,15 @@ function addWarningIndicatorToAttachment(element) {
       e.stopPropagation();
       e.preventDefault();
 
-      this.ui.showSecretWarning('Unknown PDF', {
-        secrets: true,
-        findings: [{ type: 'POTENTIAL_RISK', confidence: 0.8 }],
-      });
+      // Need to get UI instance from global context since this is a standalone function
+      if (window.pdfMonitorInstance && window.pdfMonitorInstance.ui) {
+        window.pdfMonitorInstance.ui.showSecretWarning('Unknown PDF', {
+          secrets: true,
+          findings: [{ type: 'POTENTIAL_RISK', confidence: 0.8 }],
+        });
+      } else {
+        logger.warn('PDF Monitor UI not available for showing warning');
+      }
     });
 
     // Add to the element

@@ -5,6 +5,8 @@ class PDFMonitor {
     this.ui = new PDFMonitorUI(logger);
     this.interceptor = new PDFInterceptor(this.ui, this.sendMessage.bind(this));
     logger.log("PDF Monitor initializing");
+    // Set global reference for standalone functions to access
+    window.pdfMonitorInstance = this;
     this.init();
   }
 
@@ -32,23 +34,42 @@ class PDFMonitor {
   async sendMessage(message) {
     return new Promise((resolve, reject) => {
       try {
+        // Check if Chrome runtime is available and extension context is valid
         if (!chrome || !chrome.runtime) {
-          return reject(new Error('Extension context unavailable'));
+          const error = new Error('Extension context unavailable');
+          logger.error('Chrome runtime not available');
+          this.ui.showScanErrorIndicator(
+            message.filename || 'File',
+            'Extension context unavailable. Please refresh the page.'
+          );
+          return reject(error);
         }
+
+        // Check if runtime.id is available (indicates valid context)
+        if (!chrome.runtime.id) {
+          const error = new Error('Extension context invalidated');
+          logger.error('Extension context invalidated - runtime.id not available');
+          this.ui.showScanErrorIndicator(
+            message.filename || 'File',
+            'Extension was reloaded. Please try again.'
+          );
+          return reject(error);
+        }
+
         chrome.runtime.sendMessage(message, (response) => {
           const runtimeError = chrome.runtime.lastError;
           if (runtimeError) {
-            if (runtimeError.message.includes('context invalidated')) {
+            logger.error('Runtime error:', runtimeError.message);
+            if (runtimeError.message.includes('context invalidated') || 
+                runtimeError.message.includes('Extension context') ||
+                runtimeError.message.includes('receiving end does not exist')) {
               this.ui.showScanErrorIndicator(
                 message.filename || 'File',
                 'Extension was reloaded. Please try again.'
               );
-              console.error(
-                '[PDF Scanner] Extension context invalidated. The extension may have been reloaded.'
-              );
-              return reject(new Error('Extension context invalidated'));
+              console.error('[PDF Scanner] Extension context error:', runtimeError);
             }
-            return reject(runtimeError);
+            return reject(new Error(runtimeError.message));
           }
           if (!response) {
             return reject(new Error('No response received from background script'));
@@ -56,6 +77,7 @@ class PDFMonitor {
           resolve(response);
         });
       } catch (error) {
+        logger.error('Error in sendMessage:', error.message);
         if (
           error.message.includes('Extension context') ||
           error.message.includes('invalidated') ||
