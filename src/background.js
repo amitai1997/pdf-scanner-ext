@@ -438,7 +438,7 @@ class PDFScannerBackground {
       // Check if notifications are permitted
       const notificationId = await chrome.notifications.create({
         type: 'basic',
-        iconUrl: 'icons/icon.png', // Correct path for Chrome extension
+        iconUrl: 'public/icons/icon16.png', // 16x16 PNG icon for notifications
         title: title || 'PDF Scanner',
         message: body || 'Scan completed',
       });
