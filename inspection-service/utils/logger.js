@@ -1,146 +1,81 @@
 /**
- * Console logger used by the inspection service.
- * Supports basic level filtering.
+ * Simple logger for the inspection service
  */
-
-const LOG_LEVELS = {
-  error: 0,
-  warn: 1,
-  info: 2,
-  debug: 3
-};
-
 class Logger {
-  constructor(level = 'info') {
-    this.level = LOG_LEVELS[level] || LOG_LEVELS.info;
-    this.serviceName = 'PDF-Scanner-Service';
-  }
-
-  /**
-   * Set logging level
-   * @param {string} level - Log level (error, warn, info, debug)
-   */
-  setLevel(level) {
-    this.level = LOG_LEVELS[level] || LOG_LEVELS.info;
-  }
-
-  /**
-   * Format log message with timestamp and level
-   * @param {string} level - Log level
-   * @param {string} message - Log message
-   * @param {any} data - Optional data to log
-   * @returns {string} Formatted message
-   */
-  formatMessage(level, message, data = null) {
-    const timestamp = new Date().toISOString();
-    const prefix = `${timestamp} [${this.serviceName}] [${level.toUpperCase()}]`;
+  constructor(options = {}) {
+    const {
+      level = 'info',
+      serviceName = 'PDF-Scanner-Service',
+    } = options;
     
-    if (data !== null && data !== undefined) {
-      return `${prefix} ${message}`;
-    }
-    return `${prefix} ${message}`;
+    this.serviceName = serviceName;
+    this.level = { error: 0, warn: 1, info: 2, debug: 3 }[level] || 2;
   }
 
-  /**
-   * Log error message
-   * @param {string} message - Error message
-   * @param {any} data - Optional error data
-   */
+  formatMessage(level, message) {
+    const timestamp = new Date().toISOString();
+    return `${timestamp} [${this.serviceName}] [${level.toUpperCase()}] ${message}`;
+  }
+
   error(message, data = null) {
-    if (this.level >= LOG_LEVELS.error) {
+    if (this.level >= 0) {
+      const formatted = this.formatMessage('error', message);
       if (data !== null && data !== undefined) {
-        console.error(this.formatMessage('error', message), data);
+        console.error(formatted, data);
       } else {
-        console.error(this.formatMessage('error', message));
+        console.error(formatted);
       }
     }
   }
 
-  /**
-   * Log warning message
-   * @param {string} message - Warning message
-   * @param {any} data - Optional warning data
-   */
   warn(message, data = null) {
-    if (this.level >= LOG_LEVELS.warn) {
+    if (this.level >= 1) {
+      const formatted = this.formatMessage('warn', message);
       if (data !== null && data !== undefined) {
-        console.warn(this.formatMessage('warn', message), data);
+        console.warn(formatted, data);
       } else {
-        console.warn(this.formatMessage('warn', message));
+        console.warn(formatted);
       }
     }
   }
 
-  /**
-   * Log info message
-   * @param {string} message - Info message
-   * @param {any} data - Optional info data
-   */
   info(message, data = null) {
-    if (this.level >= LOG_LEVELS.info) {
+    if (this.level >= 2) {
+      const formatted = this.formatMessage('info', message);
       if (data !== null && data !== undefined) {
-        console.log(this.formatMessage('info', message), data);
+        console.log(formatted, data);
       } else {
-        console.log(this.formatMessage('info', message));
+        console.log(formatted);
       }
     }
   }
 
-  /**
-   * Log debug message
-   * @param {string} message - Debug message
-   * @param {any} data - Optional debug data
-   */
+  log(message, data = null) {
+    this.info(message, data);
+  }
+
   debug(message, data = null) {
-    if (this.level >= LOG_LEVELS.debug) {
+    if (this.level >= 3) {
+      const formatted = this.formatMessage('debug', message);
       if (data !== null && data !== undefined) {
-        console.log(this.formatMessage('debug', message), data);
+        console.log(formatted, data);
       } else {
-        console.log(this.formatMessage('debug', message));
+        console.log(formatted);
       }
     }
   }
 
-  /**
-   * Log an HTTP request
-   * @param {Object} req - Express request object
-   */
   logRequest(req) {
-    if (this.level >= LOG_LEVELS.info) {
-      const message = `${req.method} ${req.originalUrl}`;
+    if (this.level >= 2) {
+      const message = `${req.method} ${req.originalUrl || req.url}`;
       this.info(message);
-    }
-  }
-
-  /**
-   * Log scan operation
-   * @param {string} filename - PDF filename
-   * @param {number} size - File size
-   * @param {string} operation - Operation type
-   * @param {any} result - Operation result
-   */
-  logScan(filename, size, operation, result = null) {
-    const message = `PDF ${operation}: ${filename} (${size} bytes)`;
-    if (result && result.secrets) {
-      this.warn(message, { secretsFound: true, findings: result.findings?.length || 0 });
-    } else {
-      this.info(message, { secretsFound: false });
-    }
-  }
-
-  /**
-   * Log structured PDF debug information
-   * @param {object} data - Debug metadata
-   */
-  debugPDF(data) {
-    if (this.level >= LOG_LEVELS.debug) {
-      console.log(this.formatMessage('debug', 'PDF Debug Entry'));
-      console.table(data);
     }
   }
 }
 
-// Create default logger instance
-const logger = new Logger(process.env.LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'debug' : 'info'));
+const serviceLogger = new Logger({
+  serviceName: 'PDF-Scanner-Service',
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'debug' : 'info')
+});
 
-module.exports = logger; 
+module.exports = serviceLogger;

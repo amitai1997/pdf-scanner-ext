@@ -3,44 +3,8 @@
  * scanner status and statistics.
  */
 
-// Create a logger for the popup
-const logger = {
-  log(message, data) {
-    try {
-      if (data !== undefined) {
-        console.log(`[PDF Scanner Popup] ${message}`, data);
-      } else {
-        console.log(`[PDF Scanner Popup] ${message}`);
-      }
-    } catch (e) {
-      // Ignore logging errors
-    }
-  },
-
-  warn(message, data) {
-    try {
-      if (data !== undefined) {
-        console.warn(`[PDF Scanner Popup] WARNING: ${message}`, data);
-      } else {
-        console.warn(`[PDF Scanner Popup] WARNING: ${message}`);
-      }
-    } catch (e) {
-      // Ignore logging errors
-    }
-  },
-
-  error(message, data) {
-    try {
-      if (data !== undefined) {
-        console.error(`[PDF Scanner Popup] ERROR: ${message}`, data);
-      } else {
-        console.error(`[PDF Scanner Popup] ERROR: ${message}`);
-      }
-    } catch (e) {
-      // Ignore logging errors
-    }
-  }
-};
+// Use shared logger if available
+const logger = typeof extensionLogger !== 'undefined' ? extensionLogger : console;
 
 /**
  * PDF Scanner Popup Controller

@@ -206,6 +206,12 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// For service worker context - make extensionLogger available globally
+if (typeof self !== 'undefined' && typeof importScripts !== 'undefined') {
+  // Service worker environment
+  self.extensionLogger = extensionLogger;
+}
+
 // For CommonJS compatibility (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
