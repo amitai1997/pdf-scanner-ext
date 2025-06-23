@@ -59,6 +59,11 @@ export default [
         checkIfBodyContainsPDF: 'readonly',
         isBase64PDF: 'readonly',
         isFileTooLarge: 'readonly',
+        extractPDFFromBody: 'readonly',
+        extractPDFFromRequest: 'readonly',
+        isPDFPart: 'readonly',
+        extractFilename: 'readonly',
+        FormDataParser: 'readonly',
         PDFMonitor: 'readonly',
         PDFMonitorUI: 'readonly',
         PDFInterceptor: 'readonly',
@@ -66,7 +71,7 @@ export default [
         showStandaloneError: 'readonly',
         removeExistingIndicators: 'readonly',
         removeExistingSecurityWarnings: 'readonly',
-        FormDataParser: 'readonly',
+  
         // Node.js/CommonJS
         module: 'readonly',
         require: 'readonly'

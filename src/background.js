@@ -4,7 +4,7 @@
  */
 
 // Load shared utilities
-importScripts('./shared/constants.js', './shared/pdfDetection.js', './shared/logger.js');
+importScripts('./shared/constants.js', './utils/formDataParser.js', './shared/pdfDetection.js', './shared/logger.js');
 
 // Use the shared extension logger
 defineLogger();
@@ -14,9 +14,6 @@ function defineLogger() {
   const logger = self.extensionLogger || console;
   self.logger = logger;
 }
-
-// Import utility scripts in the correct order
-importScripts('./utils/formDataParser.js');
 
 logger.log('PDF Scanner service worker loaded');
 
@@ -566,22 +563,19 @@ class PDFScannerBackground {
   async processWebRequest(details) {
     try {
       logger.log('Processing intercepted web request', details.url);
-      // Extract PDF from the request body using FormDataParser
-      let pdfData = null;
-      if (details.requestBody && details.requestBody.raw && details.requestBody.raw.length > 0) {
-        const buffer = details.requestBody.raw[0].bytes;
-        // Try to extract PDF from multipart or JSON
-        pdfData = FormDataParser.extractPDFFromMultipart(buffer, details) ||
-                  FormDataParser.extractPDFFromJSON(buffer);
-      }
+      // Extract PDF from the request using the high-level API
+      const pdfData = await extractPDFFromRequest(details);
+      
       if (!pdfData) {
         logger.log('No PDF found in intercepted web request');
         return;
       }
+      
       logger.log(`PDF extracted from web request: ${pdfData.filename} (${pdfData.size} bytes)`);
+      
       // Send the PDF for scanning (reuse handleInterceptedPDF logic)
       await this.handleInterceptedPDF({
-        fileData: await this._blobToDataUrl(pdfData.blob),
+        fileData: pdfData.data,
         filename: pdfData.filename,
         fileSize: pdfData.size,
         requestId: details.requestId || `webreq-${Date.now()}`
@@ -591,17 +585,7 @@ class PDFScannerBackground {
     }
   }
 
-  /**
-   * Helper to convert Blob to data URL
-   */
-  async _blobToDataUrl(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
+
 
 }
 

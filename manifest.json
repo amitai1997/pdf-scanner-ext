@@ -46,6 +46,7 @@
       "js": [
         "src/shared/constants.js",
         "src/shared/logger.js",
+        "src/utils/formDataParser.js",
         "src/shared/pdfDetection.js",
         "src/content/domHelpers.js",
         "src/content/pdfInterceptor.js",
