@@ -1,3 +1,17 @@
+class PDFInterceptor {
+  constructor(ui, messageHandler) {
+    this.ui = ui;
+    this.sendMessage = messageHandler;
+    this.fileInputs = new Set();
+    this.uploadState = { monitoring: true, pendingScans: new Map(), activeUploads: new Set() };
+    this.debugMode = true;
+    this._inputChangeListeners = new Map();
+    this._formSubmitListeners = new Map();
+    this._buttonClickListeners = new Map();
+    this._currentEscHandler = null;
+  }
+}
+
 // Dependencies loaded via manifest.json script order
 function startMonitoring() {
   try {
@@ -252,7 +266,7 @@ function setupDragAndDropMonitoring() {
 
       if (event.dataTransfer && event.dataTransfer.files) {
         const files = Array.from(event.dataTransfer.files);
-        const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+        const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
         if (pdfFiles.length > 0) {
           logger.log('PDF files dropped', {
@@ -304,7 +318,7 @@ function setupClipboardMonitoring() {
     document.addEventListener('paste', (event) => {
       if (event.clipboardData && event.clipboardData.files) {
         const files = Array.from(event.clipboardData.files);
-        const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+        const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
         if (pdfFiles.length > 0) {
           logger.log('PDF files pasted from clipboard', {
@@ -457,7 +471,7 @@ function handleFileInputChange(event) {
     const files = Array.from(input.files || []);
 
     // Filter for PDF files using shared logic
-    const pdfFiles = files.filter((file) => PDFMonitor._isPdfCandidate(file));
+    const pdfFiles = files.filter((file) => isPdfCandidate(file));
 
     if (pdfFiles.length === 0) {
       return;
@@ -540,7 +554,7 @@ function handleFormSubmit(event) {
 
     fileInputs.forEach((input) => {
       const files = Array.from(input.files || []);
-      hasPDF = hasPDF || files.some((file) => PDFMonitor._isPdfCandidate(file));
+      hasPDF = hasPDF || files.some((file) => isPdfCandidate(file));
     });
 
     if (hasPDF) {
@@ -636,3 +650,97 @@ function trackUpload(file) {
     logger.error('Error tracking upload', { error: error.message });
   }
 }
+
+async function scanPDFImmediately(file) {
+  try {
+    logger.log(`=== IMMEDIATE SCAN START ===`);
+    logger.log(`Scanning PDF immediately: ${file.name} (${file.size} bytes)`);
+    logger.log('File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+      webkitRelativePath: file.webkitRelativePath || 'N/A',
+    });
+    const fileData = await this.readFileAsDataURL(file);
+    logger.log(
+      `File data read, sending to background. Data length: ${fileData ? fileData.length : 0}`
+    );
+    const response = await this.sendMessage({
+      type: 'scan',
+      filename: file.name,
+      fileSize: file.size,
+      fileData,
+    });
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Unknown error scanning PDF');
+    }
+    logger.log(`=== IMMEDIATE SCAN COMPLETE ===`);
+    return response.result;
+  } catch (error) {
+    logger.error('Error scanning PDF immediately:', error);
+    if (
+      error.message.includes('Scanning service temporarily unavailable') ||
+      error.message.includes('Scanning service unavailable')
+    ) {
+      this.ui.showScanErrorIndicator(
+        file.name,
+        'Security scanning service is temporarily unavailable. Please try uploading again in a moment.'
+      );
+    } else if (
+      error.message.includes('Extension context') ||
+      error.message.includes('invalidated') ||
+      error.message.includes('unavailable')
+    ) {
+      this.ui.showScanErrorIndicator(
+        file.name,
+        'Extension was reloaded or is unavailable. Please refresh the page and try again.'
+      );
+    } else {
+      this.ui.showScanErrorIndicator(file.name, `Scan error: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    logger.log(
+      `Reading file: ${file.name}, size: ${file.size}, type: ${file.type}, lastModified: ${file.lastModified}`
+    );
+    reader.onload = () => {
+      const result = reader.result;
+      const dataSize = result ? result.length : 0;
+      logger.log(`File read complete: ${file.name}, data size: ${dataSize}`);
+      if (result && typeof result === 'string') {
+        const preview = result.substring(0, 100);
+        logger.log(`File data preview: ${preview}...`);
+      }
+      resolve(result);
+    };
+    reader.onerror = () => {
+      logger.error(`Failed to read file: ${file.name}`);
+      reject(new Error('Failed to read file'));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+PDFInterceptor.prototype.startMonitoring = startMonitoring;
+PDFInterceptor.prototype.checkForChatGPTFileElements = checkForChatGPTFileElements;
+PDFInterceptor.prototype.addWarningIndicatorToAttachment = addWarningIndicatorToAttachment;
+PDFInterceptor.prototype.setupDragAndDropMonitoring = setupDragAndDropMonitoring;
+PDFInterceptor.prototype.setupClipboardMonitoring = setupClipboardMonitoring;
+PDFInterceptor.prototype.monitorFileSelectionDialog = monitorFileSelectionDialog;
+PDFInterceptor.prototype.stopMonitoring = stopMonitoring;
+PDFInterceptor.prototype.scanForFileInputs = scanForFileInputs;
+PDFInterceptor.prototype.setupFormSubmissionMonitoring = setupFormSubmissionMonitoring;
+PDFInterceptor.prototype.handleFileInputChange = handleFileInputChange;
+PDFInterceptor.prototype.handleFormSubmit = handleFormSubmit;
+PDFInterceptor.prototype.handleButtonClick = handleButtonClick;
+PDFInterceptor.prototype.trackUpload = trackUpload;
+PDFInterceptor.prototype.scanPDFImmediately = scanPDFImmediately;
+PDFInterceptor.prototype.readFileAsDataURL = readFileAsDataURL;
+
+window.PDFInterceptor = PDFInterceptor;
