@@ -72,14 +72,5 @@
         "https://*.anthropic.com/*"
       ]
     }
-  ],
-
-  "commands": {
-    "scan-selected-pdf": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+S"
-      },
-      "description": "Scan currently selected PDF"
-    }
-  }
+  ]
 }
