@@ -3,7 +3,7 @@ class PDFInterceptor {
     this.ui = ui;
     this.sendMessage = messageHandler;
     this.fileInputs = new Set();
-    this.uploadState = { monitoring: true, pendingScans: new Map(), activeUploads: new Set() };
+    this.uploadState = { monitoring: true };
     this.debugMode = true;
     this._inputChangeListeners = new Map();
     this._formSubmitListeners = new Map();
@@ -309,9 +309,6 @@ function setupDragAndDropMonitoring() {
                 logger.error('Error during immediate scan of dropped PDF', error);
                 this.ui.showScanErrorIndicator(file.name);
               });
-
-            // Also track the upload through our normal channels as backup
-            this.trackUpload(file);
           });
         }
       }
@@ -371,9 +368,6 @@ function setupClipboardMonitoring() {
                 logger.error('Error during immediate scan of pasted PDF', error);
                 this.ui.showScanErrorIndicator(file.name);
               });
-
-            // Also track the upload through our normal channels as backup
-            this.trackUpload(file);
           });
         }
       }
@@ -544,9 +538,6 @@ function handleFileInputChange(event) {
           // On error, we allow the upload to proceed but log the error
           this.ui.showScanErrorIndicator(file.name);
         });
-
-      // Also track the upload through our normal channels as backup
-      this.trackUpload(file);
     });
   } catch (error) {
     logger.error('Error handling file input change', { error: error.message });
@@ -608,58 +599,6 @@ function handleButtonClick(event) {
     }
   } catch (error) {
     logger.error('Error handling button click', { error: error.message });
-  }
-}
-
-/**
- * Track a file upload
- * @param {File} file - File being uploaded
- */
-function trackUpload(file) {
-  try {
-    const fileId = `${file.name}-${file.size}-${Date.now()}`;
-
-    this.uploadState.activeUploads.add(fileId);
-
-    logger.log('Tracking file upload', {
-      fileId,
-      filename: file.name,
-      size: file.size,
-    });
-
-    // Notify background about potential upcoming upload
-    this.sendMessage({
-      type: 'pdf_selected',
-      fileId,
-      filename: file.name,
-      size: file.size,
-      timestamp: Date.now(),
-    });
-
-    // Read the file and send it to the background script for scanning
-    try {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64data = reader.result;
-        this.sendMessage({
-          type: 'intercepted_pdf',
-          requestId: fileId,
-          filename: file.name,
-          fileSize: file.size,
-          fileData: base64data,
-        }).catch((err) => {
-          logger.error('Error sending PDF to background', err);
-        });
-      };
-      reader.onerror = (error) => {
-        logger.error('Error reading PDF file', error);
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      logger.error('Error reading file', error);
-    }
-  } catch (error) {
-    logger.error('Error tracking upload', { error: error.message });
   }
 }
 
@@ -751,7 +690,6 @@ PDFInterceptor.prototype.setupFormSubmissionMonitoring = setupFormSubmissionMoni
 PDFInterceptor.prototype.handleFileInputChange = handleFileInputChange;
 PDFInterceptor.prototype.handleFormSubmit = handleFormSubmit;
 PDFInterceptor.prototype.handleButtonClick = handleButtonClick;
-PDFInterceptor.prototype.trackUpload = trackUpload;
 PDFInterceptor.prototype.scanPDFImmediately = scanPDFImmediately;
 PDFInterceptor.prototype.readFileAsDataURL = readFileAsDataURL;
 

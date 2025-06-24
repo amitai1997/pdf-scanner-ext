@@ -22,7 +22,7 @@ class PDFScannerBackground {
     // Configuration for local backend service
     this.APP_ID = 'cc6a6cfc-9570-4e5a-b6ea-92d2adac90e4';
     this.API_URL = 'http://localhost:3001/scan';
-    this.scanQueue = new Map();
+
     this.scanStats = {
       scanCount: 0,
       lastScan: null,
@@ -189,22 +189,9 @@ class PDFScannerBackground {
           break;
         }
         
-        case 'pdf_selected': {
-          // PDF file was selected by user
-          logger.log('PDF selected in tab:', sender.tab ? sender.tab.id : 'unknown');
-          sendResponse({ success: true });
-          break;
-        }
+
         
-        case 'intercepted_pdf': {
-          // PDF was intercepted (form upload, XHR, etc.)
-          logger.log('PDF intercepted:', message.filename);
-          this.handleInterceptedPDF(message).catch(err => {
-            logger.error('Error handling intercepted PDF:', err);
-          });
-          sendResponse({ success: true });
-          break;
-        }
+
         
         case 'GET_SCAN_STATS': {
           // Popup is requesting scan statistics
@@ -268,81 +255,7 @@ class PDFScannerBackground {
     }
   }
 
-  /**
-   * Handle a PDF intercepted from DOM events
-   * @param {Object} message - Message with PDF data
-   * @returns {Object} - Scan result
-   */
-  async handleInterceptedPDF(message) {
-    try {
-      const { fileData, filename, fileSize, requestId } = message;
-      // ── Zero‑byte guard ──
-      if (fileSize === 0) {
-        logger.warn('[PDF Scanner] Skipping 0‑byte upload:', filename);
-        return;               // do not hash, do not scan
-      }
-      
-      logger.log(`Intercepted PDF: ${filename} (${fileSize} bytes), ID: ${requestId}`);
-      
-      if (this.debugMode) {
-        logger.log('File data type:', typeof fileData);
-        if (typeof fileData === 'string') {
-          logger.log('File data preview:', fileData.substring(0, 50) + '...');
-        }
-      }
-      
-      // Add to scan queue
-      this.scanQueue.set(requestId, {
-        status: 'queued',
-        timestamp: Date.now(),
-        fileData,
-        filename,
-        fileSize
-      });
-      
-      // Call scan function (same as used by popup)
-      const result = await this.scanPDF({
-        fileData,
-        filename,
-        fileSize,
-        uniqueId: `${requestId}_${Date.now()}` // Add unique ID to ensure independent scans
-      });
-      
-      // Update queue status
-      this.scanQueue.set(requestId, {
-        status: 'completed',
-        timestamp: Date.now(),
-        result
-      });
-      
-      // Note: Intercepted scans are for background monitoring only
-      // Tab warnings are only shown for immediate user-initiated scans
-      // This prevents duplicate warnings from showing
-      
-      // Log the scan
-      await this.logScanResult(filename, result);
-      
-      // Clean up queue after 5 minutes
-      setTimeout(() => {
-        this.scanQueue.delete(requestId);
-      }, 5 * 60 * 1000);
-      
-      return result;
-    } catch (error) {
-      logger.error('Error handling intercepted PDF:', error);
-      
-      // Update queue with error
-      if (message.requestId) {
-        this.scanQueue.set(message.requestId, {
-          status: 'error',
-          timestamp: Date.now(),
-          error: error.message
-        });
-      }
-      
-      throw error;
-    }
-  }
+
 
   async scanPDF(message) {
     const { fileData, filename, fileSize, uniqueId } = message;
