@@ -94,18 +94,6 @@ cd inspection-service
 cp env.template .env
 ```
 
-Edit the `.env` file:
-
-```env
-# Required: Prompt Security API credentials
-PROMPT_SECURITY_APP_ID=your-app-id-here
-
-# Optional: Service configuration
-INSPECTION_PORT=3001
-NODE_ENV=development
-LOG_LEVEL=debug
-```
-
 > **Note**: The template includes a test APP_ID for development. For production use, obtain your own credentials from [Prompt Security](https://prompt.security).
 
 ### Step 3: Start the Inspection Service
@@ -246,19 +234,11 @@ This approach ensures all dependencies are available globally before dependent c
 - Graceful degradation when API unavailable
 
 ### Planned Optimizations
-- WebAssembly Integration: Move PDF parsing to WASM for speed improvement
-- Incremental Scanning: Stream-based processing for large files
-- Smart Caching: LRU cache with 24-hour TTL for repeated uploads
-- Web Workers: Offload heavy processing to background threads
 - Batch Processing: Queue multiple files for efficient scanning
-- CDN Distribution: Serve extension assets from edge locations
 - Compression: Gzip request/response payloads
-- Connection Pooling: Reuse HTTP connections to API
 - Temporary scan disable option: Allow users to pause scanning for a limited time.
-- Detailed scan results: Display more granular information about detected issues.
 - Scan history: Maintain a log of past scans for user reference.
 - Trusted PDF whitelist: Let users mark certain PDFs as safe to bypass scanning.
 - Explicit timeouts for large files: Set clear limits to avoid hanging on oversized PDFs.
-- Improved handling of corrupted PDFs: Detect and gracefully report unreadable or malformed files.
 - Retry on network failures: Automatically attempt to rescan if a network error occurs.
 - Basic test coverage: Add simple tests to ensure core features work as expected.
