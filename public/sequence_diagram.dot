@@ -1,0 +1,12 @@
+digraph Sequence {
+  rankdir=LR;
+  node [shape=box, style=filled, fillcolor="#e0e7ff", fontname="Helvetica"];
+  "User" -> "Content Script" [label="selects PDF"];
+  "Content Script" -> "Background Worker" [label="send file data"];
+  "Background Worker" -> "Inspection Service" [label="POST /scan"];
+  "Inspection Service" -> "Prompt Security API" [label="scan text"];
+  "Prompt Security API" -> "Inspection Service" [label="results"];
+  "Inspection Service" -> "Background Worker" [label="response"];
+  "Background Worker" -> "Content Script" [label="scan result"];
+  "Content Script" -> "User" [label="display warning"];
+}

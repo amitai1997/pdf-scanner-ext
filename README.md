@@ -2,16 +2,16 @@
 
 ## Overview
 
-PDF Scanner is a Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, Gemini, etc.) and scans them for sensitive information **before** they leave your browser. It helps prevent accidental data leaks by detecting secrets, credentials, and other sensitive data in real-time.
+PDF Scanner is a Chrome extension that intercepts PDF uploads to AI services (ChatGPT, Claude, Gemini, etc.) and scans them for sensitive information **before** they leave your browser. It relies on a lightweight inspection service that forwards extracted text to the Prompt Security API. This prevents accidental data leaks by detecting secrets, credentials and other sensitive data in real time.
 
 ### Key Features
 
-- **Real-time PDF scanning** - Intercepts uploads before they reach AI services
-- **Instant alerts** - Visual warnings when secrets are detected
-- **Multiple detection methods** - File selection, drag & drop, clipboard paste, XHR/fetch
-- **Daily statistics** - Track your scanning activity
-- **Graceful degradation** - Allows uploads when service is unavailable
-- **Zero-config** - Works out of the box with sensible defaults
+- **Real-time PDF scanning** – Intercepts uploads before they reach AI services
+- **Instant alerts** – Visual warnings when secrets are detected
+- **Multiple detection methods** – File selection, drag & drop and clipboard paste
+- **Daily statistics** – Track your scanning activity
+- **Graceful degradation** – Allows uploads when service is unavailable
+- **Zero-config** – Works out of the box with sensible defaults
 
 ### Architecture
 
@@ -29,7 +29,7 @@ The system consists of three main components:
 <summary>Sequence Diagram</summary>
 
 <div align="center">
-  <img src="public/sequence_diagram.png" alt="Sequence Diagram" width="700">
+  <img src="public/sequence_diagram.svg" alt="Sequence Diagram" width="700">
 </div>
 
 </details>
@@ -94,18 +94,6 @@ cd inspection-service
 cp env.template .env
 ```
 
-Edit the `.env` file:
-
-```env
-# Required: Prompt Security API credentials
-PROMPT_SECURITY_APP_ID=your-app-id-here
-
-# Optional: Service configuration
-INSPECTION_PORT=3001
-NODE_ENV=development
-LOG_LEVEL=debug
-```
-
 > **Note**: The template includes a test APP_ID for development. For production use, obtain your own credentials from [Prompt Security](https://prompt.security).
 
 ### Step 3: Start the Inspection Service
@@ -167,21 +155,21 @@ curl http://localhost:3001/health
 
 The extension uses traditional script loading instead of ES6 modules for maximum browser compatibility. Scripts are loaded in a specific order via `manifest.json`:
 
-1. **Shared dependencies** (`constants.js`, `logger.js`) - Global utilities
-2. **Content utilities** (`logger.js`, `constants.js`, `domHelpers.js`) - Content-specific helpers  
-3. **Core functionality** (`xhrFetchInterceptor.js`, `watchers.js`) - Upload monitoring
-4. **UI components** (`PDFMonitorUI.js`) - User interface classes and functions
-5. **Main logic** (`pdfMonitor.js`, `index.js`) - Core PDF monitoring class and entry point
+1. **Shared dependencies** (`constants.js`, `logger.js`, `pdfDetection.js`)
+2. **DOM helpers** (`domHelpers.js`)
+3. **Upload interception** (`pdfInterceptor.js`)
+4. **UI components** (`PDFMonitorUI.js`)
+5. **Main logic** (`pdfMonitor.js`, `index.js`)
 
 This approach ensures all dependencies are available globally before dependent code executes, avoiding module loading issues in Chrome extensions.
 
 ### Key Components
 
-- **PDFMonitor**: Main class that orchestrates PDF detection and scanning
-- **Watchers**: Functions that monitor various upload methods (drag & drop, file inputs, etc.)
-- **XHR/Fetch Interceptor**: Captures HTTP requests containing PDF data
-- **PDFMonitorUI**: Handles all user interface elements (indicators, modals, warnings)
-- **Shared utilities**: Common functions used across extension and service
+- **PDFMonitor** – Orchestrates PDF detection and scanning
+- **PDFInterceptor** – Hooks into file inputs, drag & drop and clipboard events
+- **Background worker** – Sends scan requests and tracks statistics
+- **PDFMonitorUI** – Displays indicators and warnings
+- **Shared utilities** – Common helpers used across extension and service
 
 ---
 
@@ -246,19 +234,11 @@ This approach ensures all dependencies are available globally before dependent c
 - Graceful degradation when API unavailable
 
 ### Planned Optimizations
-- WebAssembly Integration: Move PDF parsing to WASM for speed improvement
-- Incremental Scanning: Stream-based processing for large files
-- Smart Caching: LRU cache with 24-hour TTL for repeated uploads
-- Web Workers: Offload heavy processing to background threads
 - Batch Processing: Queue multiple files for efficient scanning
-- CDN Distribution: Serve extension assets from edge locations
 - Compression: Gzip request/response payloads
-- Connection Pooling: Reuse HTTP connections to API
 - Temporary scan disable option: Allow users to pause scanning for a limited time.
-- Detailed scan results: Display more granular information about detected issues.
 - Scan history: Maintain a log of past scans for user reference.
 - Trusted PDF whitelist: Let users mark certain PDFs as safe to bypass scanning.
 - Explicit timeouts for large files: Set clear limits to avoid hanging on oversized PDFs.
-- Improved handling of corrupted PDFs: Detect and gracefully report unreadable or malformed files.
 - Retry on network failures: Automatically attempt to rescan if a network error occurs.
 - Basic test coverage: Add simple tests to ensure core features work as expected.
