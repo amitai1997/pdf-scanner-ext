@@ -249,10 +249,7 @@ class PDFScannerBackground {
         // For now, just log. In future versions, we could try to detect
         // PDF files in the current tab or show a file picker
         logger.log('Scan PDF shortcut triggered');
-        await this.showNotification({
-          title: 'PDF Scanner',
-          message: 'Use the extension popup to select and scan PDF files.',
-        });
+        // Note: UI feedback for commands is handled by content scripts/PDFMonitorUI
         break;
     }
   }
@@ -428,55 +425,7 @@ class PDFScannerBackground {
     }
   }
 
-  async showNotification(message) {
-    if (!message || typeof message !== 'object') {
-      logger.error('Invalid notification message:', message);
-      return;
-    }
 
-    const { title, message: body } = message;
-    const notificationTitle = title || 'PDF Scanner';
-    const notificationMessage = body || 'Scan completed';
-
-    try {
-      // Create notification options with all required fields
-      const notificationOptions = {
-        type: 'basic',
-        title: String(notificationTitle),
-        message: String(notificationMessage),
-        iconUrl: chrome.runtime.getURL('public/icons/icon16.png') // Use the valid icon file
-      };
-
-      logger.log('Creating notification with options:', JSON.stringify(notificationOptions));
-      logger.log('Options type check - type:', typeof notificationOptions.type, 'title:', typeof notificationOptions.title, 'message:', typeof notificationOptions.message);
-
-      try {
-        const notificationId = await chrome.notifications.create(notificationOptions);
-        
-        logger.log('Notification shown:', notificationId);
-
-        // Auto-clear notification after 5 seconds
-        setTimeout(() => {
-          chrome.notifications.clear(notificationId);
-        }, 5000);
-      } catch (createError) {
-        logger.error('Error creating notification:', createError);
-        
-        if (chrome.runtime.lastError) {
-          logger.error('Chrome runtime error:', JSON.stringify(chrome.runtime.lastError));
-          logger.error('Error message:', chrome.runtime.lastError.message);
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to show notification:', error);
-      
-      // Check for runtime.lastError
-      if (chrome.runtime.lastError) {
-        logger.error('Chrome runtime error:', JSON.stringify(chrome.runtime.lastError));
-        logger.error('Error message:', chrome.runtime.lastError.message);
-      }
-    }
-  }
 
   // Utility method to log scan results (for observability)
   /**
@@ -532,33 +481,28 @@ class PDFScannerBackground {
     try {
       logger.log(`Showing warning in tab ${tabId} for file ${filename}`);
       
-      // Send message to content script to display warning
+      // Send message to content script to display warning via PDFMonitorUI
       await chrome.tabs.sendMessage(tabId, {
         type: 'show_warning',
         filename,
         result
       });
       
-      // Also show a notification
-      await this.showNotification({
-        title: '⚠️ Security Alert',
-        message: `Secrets detected in PDF: ${filename}. Upload blocked.`
-      });
-      
     } catch (error) {
       logger.error('Error showing warning in tab:', error);
       
-      // Fallback to notification if content script messaging fails
-      await this.showNotification({
-        title: '⚠️ Security Alert',
-        message: `Secrets detected in PDF: ${filename}. Please check the file before uploading.`
-      });
+      // If content script messaging fails, try showing an error indicator
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          type: 'show_error',
+          filename,
+          message: 'Security alert: Please check the file before uploading.'
+        });
+      } catch (fallbackError) {
+        logger.error('Fallback error message also failed:', fallbackError);
+      }
     }
   }
-
-
-
-
 
 }
 
