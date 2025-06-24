@@ -36,21 +36,6 @@ const app            = express();
 // Add a cache for PDF parsing results at the top level
 const pdfParseCache = new Map();
 const pdfParsePromises = new Map(); // Cache for ongoing parsing promises
-// In-memory debug cache (LRU up to 10 entries)
-const debugCache = new Map();
-const debugStats = { processed: 0, failures: 0 };
-
-function addDebugEntry(hash, data) {
-  debugCache.set(hash, data);
-  debugStats.processed += 1;
-  if (data.parseStrategy === 'fallback') {
-    debugStats.failures += 1;
-  }
-  while (debugCache.size > 10) {
-    const oldestKey = debugCache.keys().next().value;
-    debugCache.delete(oldestKey);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // 3. Utilities
@@ -129,7 +114,6 @@ async function extractPDFTextDeterministic(buffer, filename) {
       
       // Convert buffer to different string formats for analysis
       const binaryString = buffer.toString('binary');
-      const utf8String = buffer.toString('utf8');
       
       let extractedText = '';
       
@@ -161,25 +145,11 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   const decompressed = zlib.inflateSync(decoded);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  logger.debug(`Decoded content: "${decompressedText}"`);
+                  logger.debug(`Decoded content length: ${decompressedText.length}`);
+                  extractedText += ' ' + decompressedText;
                   
-                  // Check if this contains our AWS key
-                  if (decompressedText.includes('AKIA')) {
-                    logger.info(`AWS key found in decoded content!`);
-                    extractedText = decompressedText; // Use ONLY this content
-                    break; // Stop processing other streams
-                  } else {
-                    extractedText += ' ' + decompressedText;
-                  }
                 } catch (decodeError) {
                   logger.warn(`ASCII85+FlateDecode decode failed: ${decodeError.message}`);
-                  
-                  // Fallback: search for patterns in the raw ASCII85 data
-                  const awsInStream = streamData.match(/AKIA[A-Z0-9]{16}/g);
-                  if (awsInStream) {
-                    extractedText += ' ' + awsInStream.join(' ');
-                    logger.info(`Found AWS keys in raw ASCII85 stream: ${awsInStream.join(', ')}`);
-                  }
                 }
               } else {
                 // Try direct FlateDecode (zlib compressed)
@@ -188,16 +158,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
                   const decompressed = zlib.inflateSync(streamBytes);
                   const decompressedText = decompressed.toString('utf8');
                   
-                  logger.debug(`FlateDecode: "${decompressedText}"`);
+                  logger.debug(`FlateDecode content length: ${decompressedText.length}`);
+                  extractedText += ' ' + decompressedText;
                   
-                  // Check if this contains our AWS key
-                  if (decompressedText.includes('AKIA')) {
-                    logger.info(`AWS key found!`);
-                    extractedText = decompressedText; // Use ONLY this content
-                    break; // Stop processing other streams
-                  } else {
-                    extractedText += ' ' + decompressedText;
-                  }
                 } catch (decompError) {
                   logger.warn(`FlateDecode decompression failed: ${decompError.message}`);
                 }
@@ -211,65 +174,9 @@ async function extractPDFTextDeterministic(buffer, filename) {
         logger.warn(`Error in stream decompression: ${e.message}`);
       }
       
-      // 1. Look for direct secret patterns in binary data FIRST  
-      const awsKeyPattern = /AKIA[A-Z0-9]{16}/g;
-      const secretPattern = /[A-Za-z0-9+/]{40,}/g; // AWS secret keys and similar
-      
-      // Also look for patterns in the compressed stream content
-      const compressedPatterns = [
-        /[A-Za-z0-9]{20,40}/g,  // Potential encoded secrets
-        /[A-Z0-9]{16,}/g,       // AWS-style keys
-        /[A-Za-z0-9+/=]{30,}/g  // Base64-like strings
-      ];
-      
-      const awsKeys = binaryString.match(awsKeyPattern) || [];
-      const secrets = binaryString.match(secretPattern) || [];
-      
-      // Extract from compressed streams - look for the encoded content
-      let compressedSecrets = [];
-      for (const pattern of compressedPatterns) {
-        const matches = binaryString.match(pattern) || [];
-        compressedSecrets = compressedSecrets.concat(
-          matches.filter(match => 
-            match.length >= 20 && 
-            !match.includes('PDF') && 
-            !match.includes('obj') &&
-            !match.includes('ReportLab') &&
-            /[A-Za-z0-9]/.test(match) // Must contain alphanumeric
-          )
-        );
-      }
-      
-      // PRIORITIZE actual secrets over metadata
-      if (awsKeys.length > 0) {
-        extractedText = awsKeys.join(' '); // Use ONLY the AWS keys
-        logger.info(`AWS keys found: ${awsKeys.join(', ')}`);
-      } else if (secrets.length > 0) {
-        // Filter out short matches and PDF noise
-        const realSecrets = secrets.filter(s => s.length >= 20 && !s.includes('obj') && !s.includes('PDF'));
-        if (realSecrets.length > 0) {
-          extractedText = realSecrets.join(' '); // Use ONLY the secrets
-          logger.debug(`Potential secrets found: ${realSecrets.length} matches`);
-        }
-      } else if (compressedSecrets.length > 0) {
-        // Only use compressed secrets if no direct secrets found
-        const uniqueSecrets = [...new Set(compressedSecrets)].sort((a, b) => b.length - a.length);
-        // Filter out PDF metadata hashes
-        const filteredSecrets = uniqueSecrets.filter(s => 
-          !s.match(/^[0-9a-f]{32}$/) && // Not MD5 hash
-          !s.includes('f2bee42f') && // Not the known PDF hash
-          s.length >= 15
-        );
-        
-        if (filteredSecrets.length > 0) {
-          extractedText = filteredSecrets.slice(0, 5).join(' '); // Take top 5
-          logger.debug(`Compressed secrets found: ${filteredSecrets.length} matches`);
-        }
-      }
-      
-      // Only add more content if we haven't found specific secrets yet
+      // If stream extraction didn't yield sufficient text, try pattern-based extraction
       if (extractedText.trim().length < 10) {
-        // 2. Try to find readable text content (not PDF structure)
+        // Look for readable text content (not PDF structure)
         const readablePattern = /[A-Za-z][A-Za-z0-9\s.,!?]{20,}/g;
         const readableMatches = binaryString.match(readablePattern) || [];
         
@@ -287,7 +194,7 @@ async function extractPDFTextDeterministic(buffer, filename) {
           logger.debug(`Readable content: ${actualContent.length} blocks`);
         }
         
-        // 3. Last resort: extract longer alphanumeric sequences (but skip PDF noise)
+        // Last resort: extract longer alphanumeric sequences (but skip PDF noise)
         if (extractedText.trim().length < 50) {
           const alphaNumPattern = /[A-Za-z0-9_\-+=]{15,}/g;
           const alphaMatches = (binaryString.match(alphaNumPattern) || [])
@@ -374,23 +281,6 @@ async function extractPDFTextDeterministic(buffer, filename) {
 }
 
 // ---------------------------------------------------------------------------
-// 3b. Local secret detection helpers
-// ---------------------------------------------------------------------------
-/** Simple regex-based check for AWS access keys and similar patterns */
-function detectSecretsLocally(text) {
-  const awsKeyPattern = /AKIA[0-9A-Z]{16}/g;
-  const matches = text.match(awsKeyPattern) || [];
-
-  return matches.map(key => ({
-    type: 'Secret',
-    category: 'AWS credentials',
-    value: key,
-    severity: 'high'
-  }));
-}
-
-
-// ---------------------------------------------------------------------------
 // 4. Middleware stack
 // ---------------------------------------------------------------------------
 app.use(cors({
@@ -431,29 +321,6 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Development-only debug endpoints
-if (NODE_ENV === 'development') {
-  app.get('/debug/cache', (_req, res) => {
-    const entries = Array.from(debugCache.values());
-    res.json(entries);
-  });
-
-  app.get('/debug/cache/:hash', (req, res) => {
-    const entry = debugCache.get(req.params.hash);
-    if (!entry) return res.status(404).json({ error: 'not_found' });
-    res.json(entry);
-  });
-
-  app.get('/debug/stats', (_req, res) => {
-    res.json({ ...debugStats, cacheSize: debugCache.size });
-  });
-
-  app.delete('/debug/cache', (_req, res) => {
-    debugCache.clear();
-    res.json({ cleared: true });
-  });
-}
-
 // Main scan endpoint
 app.post('/scan', upload.single('pdf'), async (req, res, next) => {
   try {
@@ -477,11 +344,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       });
     }
 
-    // 5.2 In-memory debug log -------------------------------------------------
-    const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
-    const requestStart = Date.now();
-
-    // 5.3 Parse the PDF (with deterministic results) -----------------------------------------
+    // 5.2 Parse the PDF (with deterministic results) -----------------------------------------
     let extractedText = '';
     let pdfMeta;
     let pdfParsingFailed = false;
@@ -502,7 +365,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       extractedText = pdfMeta?.text || '';  // Use whatever we got from fallback
     }
 
-    // 5.4 Scan the text -------------------------------------------------------
+    // 5.3 Scan the text -------------------------------------------------------
     let scanResults;
 
     if (extractedText.length < 10) {
@@ -542,20 +405,9 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
         // For other API errors, still throw to be handled by error middleware
         throw apiErr;
       }
-      // ---------------------------------------------------------------
-      // Local secret detection as a safeguard against API false negatives
-      const localFindings = detectSecretsLocally(extractedText);
-      if (localFindings.length > 0) {
-        if (!scanResults.secrets) {
-          logger.warn('Local secret detection found secrets not flagged by API');
-        }
-        scanResults.secrets = true;
-        scanResults.action = 'block';
-        scanResults.findings = (scanResults.findings || []).concat(localFindings);
-      }
     }
 
-    // 5.5 Respond -------------------------------------------------------------
+    // 5.4 Respond -------------------------------------------------------------
     const secretsFound = scanResults.secrets === true;
     const action = secretsFound ? 'block' : 'allow';
     
@@ -568,23 +420,7 @@ app.post('/scan', upload.single('pdf'), async (req, res, next) => {
       scannedAt: new Date().toISOString()
     });
 
-    // Store debug metadata in memory
-    if (NODE_ENV === 'development') {
-      const duration = Date.now() - requestStart;
-      const debugEntry = {
-        hash: fileHash,
-        filename,
-        size,
-        mimetype,
-        parseStrategy: pdfParsingFailed ? 'fallback' : 'standard',
-        textPreview: extractedText.slice(0, 200),
-        timestamp: new Date().toISOString(),
-        duration,
-        action
-      };
-      addDebugEntry(fileHash, debugEntry);
-      logger.debugPDF(debugEntry);
-    }
+
   } catch (err) {
     next(err);
   }
@@ -609,7 +445,4 @@ app.listen(PORT, () => {
   logger.info(`Environment: ${NODE_ENV}`);
   logger.info(`Started at: ${new Date().toISOString()}`);
   logger.info('API Endpoints available: GET /health, POST /scan');
-  if (NODE_ENV === 'development') {
-    logger.info('Debug Endpoints: GET /debug/cache, GET /debug/cache/:hash, GET /debug/stats, DELETE /debug/cache');
-  }
 });
