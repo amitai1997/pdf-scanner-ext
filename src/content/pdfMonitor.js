@@ -107,6 +107,10 @@ class PDFMonitor {
           this.ui.showSecretWarning(message.filename, message.result);
           sendResponse({ success: true });
           break;
+        case 'show_error':
+          this.ui.showScanErrorIndicator(message.filename, message.message);
+          sendResponse({ success: true });
+          break;
         case 'stop_monitoring':
           this.interceptor.stopMonitoring();
           sendResponse({ success: true });
