@@ -133,11 +133,6 @@ class PDFScannerBackground {
         return true;
       });
       
-      // Handle browser commands (keyboard shortcuts)
-      chrome.commands.onCommand.addListener((command) => {
-        this.handleCommand(command);
-      });
-      
       // Handle extension installation/update
       chrome.runtime.onInstalled.addListener((details) => {
         this.handleInstalled(details);
@@ -228,19 +223,6 @@ class PDFScannerBackground {
     }
   }
   
-  async handleCommand(command) {
-    logger.log('Command received:', command);
-
-    switch (command) {
-      case 'scan-selected-pdf':
-        // For now, just log. In future versions, we could try to detect
-        // PDF files in the current tab or show a file picker
-        logger.log('Scan PDF shortcut triggered');
-        // Note: UI feedback for commands is handled by content scripts/PDFMonitorUI
-        break;
-    }
-  }
-
   handleInstalled(details) {
     logger.log('Extension installed/updated:', details.reason);
 
